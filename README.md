@@ -20,9 +20,8 @@ Requires PHP 8.4 or 8.5, Composer 2, and the Fileinfo, GD with JPEG/PNG/WebP,
 Mbstring, PDO SQLite, and Zip extensions.
 
 ```sh
-git clone https://github.com/skyyware/stage-cms.git
-cd stage-cms
-composer install
+composer create-project skyyware/stage-cms my-site "^0.1"
+cd my-site
 php bin/cms setup --name="Your name" --email="you@example.com"
 composer serve
 ```
@@ -84,6 +83,9 @@ Read the [architecture](docs/architecture.md) and [design](docs/design.md).
 The intent is to make the whole application understandable to one person.
 
 ## Develop and contribute
+
+Clone `https://github.com/skyyware/stage-cms.git` and run `composer install`
+when working on the application source.
 
 ```sh
 composer check

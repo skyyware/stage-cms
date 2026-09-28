@@ -12,10 +12,11 @@ use StageCms\Infrastructure\Config;
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 umask(0077);
-$command = $argv[1] ?? 'help';
+$arguments = $argv ?? [];
+$command = $arguments[1] ?? 'help';
 $options = [];
 $positionals = [];
-foreach (array_slice($argv, 2) as $argument) {
+foreach (array_slice($arguments, 2) as $argument) {
     if (str_starts_with($argument, '--')) {
         [$key, $value] = array_pad(explode('=', substr($argument, 2), 2), 2, '1');
         $options[$key] = $value;
