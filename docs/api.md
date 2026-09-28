@@ -54,7 +54,7 @@ A write using an old version returns `409 stale_revision`. Keep the proposed
 change, read the latest revision, and compare. Never blindly retry with a
 new version number.
 
-Writes have no idempotency-key mechanism in 0.1. After a lost response, read
+Writes have no idempotency-key mechanism. After a lost response, read
 the page and its history before retrying. A unique slug prevents duplicate
 creation at the same address. `GET /api/pages?q=hello-world` can locate it.
 

@@ -28,7 +28,7 @@ network share or several servers writing separate copies.
 Install a reviewed release:
 
 ```sh
-git clone --branch v0.1.0 https://github.com/skyyware/stage-cms.git
+git clone --branch v0.2.0 https://github.com/skyyware/stage-cms.git
 cd stage-cms
 composer install --no-dev --no-interaction --prefer-dist --no-plugins
 ```
