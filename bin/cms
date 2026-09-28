@@ -1,0 +1,138 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+use Stage\Security\Caller;
+use StageCms\Cms;
+use StageCms\Failure;
+use StageCms\Identity\Identity;
+use StageCms\Infrastructure\Archive;
+use StageCms\Infrastructure\Config;
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+umask(0077);
+$command = $argv[1] ?? 'help';
+$options = [];
+$positionals = [];
+foreach (array_slice($argv, 2) as $argument) {
+    if (str_starts_with($argument, '--')) {
+        [$key, $value] = array_pad(explode('=', substr($argument, 2), 2), 2, '1');
+        $options[$key] = $value;
+    } else {
+        $positionals[] = $argument;
+    }
+}
+$password = static function () use ($options): string {
+    if (isset($options['password-stdin'])) {
+        $input = stream_get_contents(STDIN, 256);
+        if ($input === false) {
+            throw new RuntimeException('Cannot read the password.');
+        }
+        return rtrim($input, "\r\n");
+    }
+    if (!stream_isatty(STDIN)) {
+        throw new Failure(422, 'password_required', 'Pass --password-stdin to read a password from standard input.');
+    }
+    fwrite(STDERR, 'Password (12–72 bytes): ');
+    $mode = shell_exec('stty -g');
+    if ($mode === null || $mode === false) {
+        throw new RuntimeException('Cannot hide password input. Use --password-stdin.');
+    }
+    exec('stty -echo');
+    try {
+        $input = fgets(STDIN, 256);
+    } finally {
+        exec('stty ' . escapeshellarg(trim($mode)));
+        fwrite(STDERR, "\n");
+    }
+    return $input === false ? '' : rtrim($input, "\r\n");
+};
+try {
+    if ($command === 'help') {
+        echo <<<'TEXT'
+Stage CMS 0.1
+
+php bin/cms setup --name="Your name" --email="you@example.com"
+php bin/cms password
+php bin/cms token --name="Editorial assistant" --scopes=content:read,content:write --days=90
+php bin/cms export /absolute/path/publication.zip
+php bin/cms restore /absolute/path/publication.zip
+php bin/cms doctor
+php bin/cms schema
+composer serve
+
+Use --password-stdin with setup or password for noninteractive input.
+Use --json for machine-readable results. A token is shown only once.
+CMS_DATA_DIR sets the private storage directory; CMS_URL sets the public origin.
+Restore accepts a portable export only into an empty publication.
+
+TEXT;
+        exit(0);
+    }
+    if ($command === 'schema') {
+        readfile(dirname(__DIR__) . '/docs/openapi.json');
+        exit(0);
+    }
+    $cms = new Cms(Config::environment(dirname(__DIR__)));
+    $caller = new Caller('owner:cli', Identity::PERMISSIONS);
+    $result = match ($command) {
+        'setup' => (function () use ($cms, $options, $password): array {
+            $cms->identity->setup($options['name'] ?? '', $options['email'] ?? '', $password());
+            return ['message' => 'Owner created. Run composer serve and open /admin.'];
+        })(),
+        'password' => (function () use ($cms, $caller, $password): array {
+            if ($cms->identity->owner() === null) {
+                throw new Failure(409, 'setup_required', 'Run setup first.');
+            }
+            $cms->identity->changePassword($caller, $password());
+            return ['message' => 'Password changed. All browser sessions have been signed out. Agent tokens remain active.'];
+        })(),
+        'token' => ['token' => $cms->identity->createToken($caller, $options['name'] ?? '', explode(',', $options['scopes'] ?? 'content:read,content:write'),
+            StageCms\Input::integer($options['days'] ?? '90'))],
+        'export' => (function () use ($cms, $caller, $positionals): array {
+            $path = $positionals[0] ?? '';
+            if (!str_starts_with($path, '/')) {
+                throw new Failure(422, 'invalid_path', 'Choose an absolute path outside public/.');
+            }
+            $directory = realpath(dirname($path));
+            $public = realpath($cms->config->root . '/public');
+            if ($directory === false || ($public !== false && ($directory === $public || str_starts_with($directory, $public . '/')))) {
+                throw new Failure(422, 'invalid_path', 'The destination directory must exist outside public/.');
+            }
+            if (file_exists($path)) {
+                throw new Failure(409, 'file_exists', 'The export destination already exists.');
+            }
+            $bytes = (new Archive($cms))->export($caller);
+            $handle = fopen($path, 'xb');
+            if ($handle === false) {
+                throw new RuntimeException('Cannot create the export file.');
+            }
+            try {
+                if (fwrite($handle, $bytes) !== strlen($bytes)) {
+                    throw new RuntimeException('Cannot write the export.');
+                }
+            } finally {
+                fclose($handle);
+            }
+            return ['message' => 'Publication exported.', 'path' => $path, 'sha256' => hash('sha256', $bytes)];
+        })(),
+        'restore' => (function () use ($cms, $caller, $positionals): array {
+            (new Archive($cms))->restore($caller, $positionals[0] ?? '');
+            return ['message' => 'Content restored. Owner credentials and tokens were not changed.'];
+        })(),
+        'doctor' => ['status' => 'ok', 'php' => PHP_VERSION, 'setup' => $cms->identity->owner() !== null, 'data' => $cms->config->data, 'url' => $cms->config->url],
+        default => throw new Failure(422, 'unknown_command', 'Unknown command. Run php bin/cms help.'),
+    };
+    if (isset($options['json'])) {
+        echo json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES) . "\n";
+    } else {
+        foreach ($result as $key => $value) {
+            echo $key . ': ' . (is_bool($value) ? ($value ? 'yes' : 'no') : $value) . "\n";
+        }
+    }
+} catch (Throwable $error) {
+    $message = $error instanceof Failure ? $error->getMessage() : 'The command failed (' . $error::class . '). Check paths, permissions, and the archive format.';
+    fwrite(STDERR, isset($options['json']) ? json_encode(['error' => $message], JSON_THROW_ON_ERROR) . "\n" : $message . "\n");
+    exit(1);
+}
