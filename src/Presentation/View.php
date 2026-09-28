@@ -49,7 +49,7 @@ final readonly class View
             <nav aria-label="Workspace">{$nav}</nav>
             <div class="sidebar-bottom"><a href="/" target="_blank" rel="noopener">View publication <span aria-hidden="true">↗</span></a>
             <a href="/admin/settings">Settings</a><form method="post" action="/admin/logout">{$csrf}<button class="link" type="submit">Sign out</button></form>
-            <span class="version">STAGE CMS / 0.1</span></div></aside>
+            <span class="version">STAGE CMS / 0.2</span></div></aside>
             <main id="main" class="main"><div class="topline"><span>WORKSPACE <span class="slash">/</span> {$site}</span><a href="/admin/help">A little guidance <span aria-hidden="true">↗</span></a></div>
             {$alerts}{$body}<footer class="app-footer"><span>A place for your next idea.</span><span>Made with Stage</span></footer></main></div>
             HTML);

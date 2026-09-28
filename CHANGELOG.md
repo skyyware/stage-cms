@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0 — 2026-09-28
+
+Applications can supply a publication theme while keeping the shared editor,
+API, permissions, and revision workflow. Authenticated draft previews use the
+same theme as published pages. Assets and API documentation resolve from the
+Composer package. The CLI accepts CMS_ROOT for a consuming application.
+
+The default publication and database schema remain compatible with 0.1.
+
 ## 0.1.0 — 2026-09-28
 
 First public release. One publication and one owner, with an editorial

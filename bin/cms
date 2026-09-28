@@ -52,7 +52,7 @@ $password = static function () use ($options): string {
 try {
     if ($command === 'help') {
         echo <<<'TEXT'
-Stage CMS 0.1
+Stage CMS 0.2
 
 php bin/cms setup --name="Your name" --email="you@example.com"
 php bin/cms password
@@ -75,7 +75,7 @@ TEXT;
         readfile(dirname(__DIR__) . '/docs/openapi.json');
         exit(0);
     }
-    $cms = new Cms(Config::environment(dirname(__DIR__)));
+    $cms = new Cms(Config::environment(getenv('CMS_ROOT') ?: dirname(__DIR__)));
     $caller = new Caller('owner:cli', Identity::PERMISSIONS);
     $result = match ($command) {
         'setup' => (function () use ($cms, $options, $password): array {

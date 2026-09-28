@@ -12,10 +12,17 @@ use StageCms\Cms;
 use StageCms\Failure;
 use StageCms\Input;
 use StageCms\Presentation\View;
+use StageCms\Presentation\Publication;
+use StageCms\Presentation\Theme;
 
 final readonly class Kernel
 {
-    public function __construct(private Cms $cms) {}
+    private Theme $theme;
+
+    public function __construct(private Cms $cms, ?Theme $theme = null)
+    {
+        $this->theme = $theme ?? new Publication($cms);
+    }
 
     /** @param array<string, mixed> $uploads */
     public function handle(Request $request, array $uploads = [], string $address = 'local'): Response
@@ -51,6 +58,17 @@ final readonly class Kernel
     private function dispatch(Context $context, View $view): Response
     {
         $request = $context->request;
+        $assets = ['/assets/cms.css' => 'text/css', '/assets/cms.js' => 'text/javascript', '/assets/mark.svg' => 'image/svg+xml'];
+        if (isset($assets[$request->path])) {
+            if (!in_array($request->method, ['GET', 'HEAD'], true)) {
+                return new Response('', 405, ['allow' => 'GET, HEAD']);
+            }
+            $bytes = file_get_contents(dirname(__DIR__, 2) . '/public' . $request->path);
+            if ($bytes === false) {
+                throw new \RuntimeException('Missing CMS asset.');
+            }
+            return new Response($bytes, 200, ['content-type' => $assets[$request->path]]);
+        }
         if (in_array($request->path, ['/health', '/api/schema', '/llms.txt'], true) && !in_array($request->method, ['GET', 'HEAD'], true)) {
             return new Response('', 405, ['allow' => 'GET, HEAD']);
         }
@@ -58,14 +76,14 @@ final readonly class Kernel
             return Response::json(['status' => $this->cms->identity->owner() === null ? 'setup_required' : 'ok']);
         }
         if ($request->path === '/api/schema') {
-            $schema = file_get_contents($this->cms->config->root . '/docs/openapi.json');
+            $schema = file_get_contents(dirname(__DIR__, 2) . '/docs/openapi.json');
             if ($schema === false) {
                 throw new \RuntimeException('Missing API schema.');
             }
             return new Response($schema, 200, ['content-type' => 'application/json']);
         }
         if ($request->path === '/llms.txt') {
-            $guide = file_get_contents($this->cms->config->root . '/docs/agents.txt');
+            $guide = file_get_contents(dirname(__DIR__, 2) . '/docs/agents.txt');
             if ($guide === false) {
                 throw new \RuntimeException('Missing agent guide.');
             }
@@ -104,7 +122,7 @@ final readonly class Kernel
             if ($request->method === 'POST' && !hash_equals($session->csrf, Input::text($context->form(), 'csrf', ''))) {
                 throw new Failure(403, 'invalid_csrf', 'This form expired. Reload the page and try again.');
             }
-            $web = new Web($this->cms, $context, $session, $view);
+            $web = new Web($this->cms, $context, $session, $view, $this->theme);
             return (new Application(
                 new Route('GET', '/admin', fn () => Web::redirect('/admin/pages')),
                 new Route('GET', '/admin/login', $web->login(...)),
@@ -132,9 +150,9 @@ final readonly class Kernel
             ))->handle($request);
         }
         return (new Application(
-            new Route('GET', '/', function () use ($view, $context): Response {
+            new Route('GET', '/', function () use ($context): Response {
                 $number = Input::integer($context->query()['page'] ?? 1);
-                return Response::html($view->publication($this->cms->pages->published($number), $this->cms->settings->get()['description'], $number));
+                return $this->theme->index($number);
             }),
             new Route('GET', '/media/{id}', function (Request $request) use ($session): Response {
                 $id = $request->parameters['id'];
@@ -143,9 +161,9 @@ final readonly class Kernel
                 $bytes = $this->cms->media->bytes($id, $caller);
                 return new Response($bytes, 200, ['content-type' => $this->cms->media->get($id)->mime]);
             }),
-            new Route('GET', '/{slug}', function (Request $request) use ($view): Response {
+            new Route('GET', '/{slug}', function (Request $request): Response {
                 $page = $this->cms->pages->publishedPage($request->parameters['slug']);
-                return Response::html($view->story($page, coverAlt: $page->draft->cover === null ? '' : $this->cms->media->get($page->draft->cover)->alt));
+                return $this->theme->page($page);
             }),
         ))->handle($request);
     }

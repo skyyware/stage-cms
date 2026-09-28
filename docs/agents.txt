@@ -1,4 +1,4 @@
-# Stage CMS 0.1
+# Stage CMS 0.2
 
 Purpose: manage a publication through the same operations used by its owner.
 Discovery: GET /api/schema returns the complete OpenAPI 3.1 contract.

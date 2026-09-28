@@ -12,10 +12,11 @@ use StageCms\Identity\Session;
 use StageCms\Infrastructure\Archive;
 use StageCms\Input;
 use StageCms\Presentation\View;
+use StageCms\Presentation\Theme;
 
 final readonly class Web
 {
-    public function __construct(private Cms $cms, private Context $context, private Session $session, private View $view) {}
+    public function __construct(private Cms $cms, private Context $context, private Session $session, private View $view, private ?Theme $theme = null) {}
 
     public static function redirect(string $path): Response
     {
@@ -110,6 +111,9 @@ final readonly class Web
     public function preview(Request $request): Response
     {
         $page = $this->cms->pages->get($this->session->caller(), $request->parameters['id']);
+        if ($this->theme !== null) {
+            return $this->theme->page($page, true);
+        }
         return Response::html($this->view->story($page, true, $page->draft->cover === null ? '' : $this->cms->media->get($page->draft->cover)->alt));
     }
 

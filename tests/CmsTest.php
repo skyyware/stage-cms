@@ -59,6 +59,48 @@ final class CmsTest extends TestCase
         }
     }
 
+    public function testThemeUsesPublishedContentAndAuthenticatedDraftPreviews(): void
+    {
+        $theme = new class implements \StageCms\Presentation\Theme {
+            public function index(int $page): \Stage\Http\Response
+            {
+                return \Stage\Http\Response::text('Custom index ' . $page);
+            }
+
+            public function page(\StageCms\Content\Page $page, bool $preview = false): \Stage\Http\Response
+            {
+                return \Stage\Http\Response::text(($preview ? 'Preview: ' : 'Published: ') . $page->draft->body);
+            }
+        };
+        $kernel = new Kernel($this->cms, $theme);
+        $page = $this->cms->pages->create($this->owner, $this->draft(body: 'Public text'), true);
+        $this->cms->pages->save($this->owner, $page->id, $this->draft(body: 'Private text'), $page->version);
+        self::assertSame('Custom index 1', $kernel->handle(new Request('GET', '/'))->body);
+        self::assertSame('Published: Public text', $kernel->handle(new Request('GET', '/a-beginning'))->body);
+        $preview = '/admin/pages/' . $page->id . '/preview';
+        self::assertSame(303, $kernel->handle(new Request('GET', $preview))->status);
+        $session = $this->cms->identity->login($this->cms->identity->newSession(), 'editor@example.test', 'a long test-only password', 'local');
+        $response = $kernel->handle(new Request('GET', $preview, headers: ['cookie' => 'stage_cms=' . $session->secret]));
+        self::assertSame('Preview: Private text', $response->body);
+        self::assertSame('no-store', $response->headers['cache-control']);
+        self::assertSame(401, $kernel->handle(new Request('GET', '/api/pages'))->status);
+    }
+
+    public function testPackageResourcesDoNotDependOnTheConsumingRoot(): void
+    {
+        $root = $this->directory . '/consumer';
+        mkdir($root);
+        $cms = new Cms(new Config($root, $this->directory . '/consumer-data'));
+        $kernel = new Kernel($cms);
+        foreach (['/assets/cms.css', '/assets/cms.js', '/assets/mark.svg', '/api/schema', '/llms.txt'] as $path) {
+            $response = $kernel->handle(new Request('GET', $path));
+            self::assertSame(200, $response->status, $path);
+            self::assertNotSame('', $response->body, $path);
+            self::assertSame(405, $kernel->handle(new Request('POST', $path))->status, $path);
+        }
+        self::assertNotSame(200, $kernel->handle(new Request('GET', '/assets/../composer.json'))->status);
+    }
+
     public function testDraftPublicationAndSlugChangesAreIndependent(): void
     {
         $page = $this->cms->pages->create($this->owner, $this->draft());

@@ -7,7 +7,7 @@ Stage CMS is an MIT-licensed PHP application built on the
 Agents use the API. Both work with the same content operations, permissions,
 and version history.
 
-**Version 0.1 is an early, working release for one publication and one owner.**
+**Version 0.2 is an early, working release for one publication and one owner.**
 It includes pages, Markdown editing, private previews, publication, revision
 restoration, an image library, agent connections, and portable export/restore.
 The API and database format may change before 1.0.
@@ -20,7 +20,7 @@ Requires PHP 8.4 or 8.5, Composer 2, and the Fileinfo, GD with JPEG/PNG/WebP,
 Mbstring, PDO SQLite, and Zip extensions.
 
 ```sh
-composer create-project skyyware/stage-cms my-site "^0.1"
+composer create-project skyyware/stage-cms my-site "^0.2"
 cd my-site
 php bin/cms setup --name="Your name" --email="you@example.com"
 composer serve
@@ -78,6 +78,8 @@ application owns content, identity, storage, and presentation. SQLite stores
 structured state; images live in a private directory. PHP renders the interface.
 A little browser JavaScript helps with formatting and unsaved changes.
 The core writing workflow also works without JavaScript.
+
+For an existing site, install this package and supply a [publication theme](docs/themes.md).
 
 Read the [architecture](docs/architecture.md) and [design](docs/design.md).
 The intent is to make the whole application understandable to one person.
