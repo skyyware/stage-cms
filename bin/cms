@@ -53,7 +53,7 @@ $password = static function () use ($options): string {
 try {
     if ($command === 'help') {
         echo <<<'TEXT'
-Stage CMS 0.2
+Stage CMS 0.3
 
 php bin/cms setup --name="Your name" --email="you@example.com"
 php bin/cms password

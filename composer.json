@@ -18,7 +18,7 @@
     "ext-pdo_sqlite": "*",
     "ext-zip": "*",
     "league/commonmark": "^2.7",
-    "skyyware/stage": "^0.1"
+    "skyyware/stage": "^0.1.1"
   },
   "require-dev": {
     "phpstan/phpstan": "^2.1",

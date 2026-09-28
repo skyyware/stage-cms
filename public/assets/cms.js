@@ -5,7 +5,8 @@ if (editor) {
   const slug = editor.querySelector('[data-slug]');
   const count = editor.querySelector('[data-word-count]');
   const state = editor.querySelector('[data-save-state]');
-  const initial = new URLSearchParams(new FormData(editor)).toString();
+  const fields = [...editor.querySelectorAll('input[name], textarea[name], select[name]')];
+  const initial = fields.map(field => field.value);
   let submitting = false;
   let slugEdited = slug.value !== '';
   slug.addEventListener('input', () => { slugEdited = true; });
@@ -14,14 +15,23 @@ if (editor) {
       slug.value = title.value.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 120).replace(/-$/, '');
     }
   });
-  const dirty = () => editor.dataset.unsaved === 'true' || new URLSearchParams(new FormData(editor)).toString() !== initial;
+  const dirty = () => editor.dataset.unsaved === 'true' || fields.some((field, index) => field.value !== initial[index]);
   const update = () => {
     const words = body.value.trim() ? body.value.trim().split(/\s+/u).length : 0;
     count.textContent = words + (words === 1 ? ' word' : ' words') + ' · ' + Math.max(1, Math.ceil(words / 220)) + ' min read';
-    state.textContent = dirty() ? 'Unsaved changes' : 'No unsaved changes';
-    state.classList.toggle('unsaved', dirty());
+    const changed = dirty();
+    state.textContent = changed ? 'Unsaved changes' : 'No unsaved changes';
+    state.classList.toggle('unsaved', changed);
   };
-  editor.addEventListener('input', update);
+  let scheduled = false;
+  editor.addEventListener('input', () => {
+    if (scheduled) return;
+    scheduled = true;
+    requestAnimationFrame(() => {
+      scheduled = false;
+      update();
+    });
+  });
   editor.addEventListener('submit', () => { submitting = true; });
   window.addEventListener('beforeunload', event => {
     if (dirty() && !submitting) {

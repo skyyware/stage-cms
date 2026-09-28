@@ -7,28 +7,76 @@ use Stage\Security\Caller;
 use StageCms\Failure;
 use StageCms\Infrastructure\Database;
 use StageCms\Input;
+use StageCms\Listing;
 
 final readonly class Pages
 {
-    private const string CURRENT = 'SELECT p.id, p.version, p.published_version, p.archived, r.title, r.slug, r.excerpt, r.body, r.cover, r.actor, r.action, r.created_at FROM pages p JOIN revisions r ON r.page_id = p.id AND r.version = p.version';
-    private const string PUBLIC = 'SELECT p.id, p.published_version AS version, p.published_version, p.archived, r.title, r.slug, r.excerpt, r.body, r.cover, r.actor, r.action, r.created_at FROM pages p JOIN revisions r ON r.page_id = p.id AND r.version = p.published_version';
-
     public function __construct(private Database $db) {}
 
     /** @return list<Page> */
     public function list(Caller $caller, string $status = 'all', string $search = '', int $page = 1): array
     {
         $caller->require('content:read');
-        $filter = match ($status) {
+        $rows = $this->db->all(self::select(includeBody: true) . ' WHERE ' . self::filter($status) . ' AND (r.title LIKE :q OR r.slug LIKE :q) ORDER BY r.created_at DESC, p.id LIMIT 50 OFFSET :offset',
+            ['q' => '%' . mb_substr($search, 0, 100) . '%', 'offset' => Listing::offset($page)]);
+        return array_map(Page::fromRow(...), $rows);
+    }
+
+    private static function select(bool $published = false, bool $includeBody = false): string
+    {
+        $version = $published ? 'p.published_version' : 'p.version';
+        return 'SELECT p.id, ' . $version . ' AS version, p.published_version, p.archived, r.title, r.slug, r.excerpt, r.cover, r.actor, r.action, r.created_at'
+            . ($includeBody ? ', r.body' : '') . ' FROM pages p JOIN revisions r ON r.page_id = p.id AND r.version = ' . $version;
+    }
+
+    private static function filter(string $status): string
+    {
+        return match ($status) {
             'archived' => 'p.archived = 1',
             'draft' => 'p.archived = 0 AND (p.published_version IS NULL OR p.version != p.published_version)',
             'published' => 'p.archived = 0 AND p.published_version IS NOT NULL',
             'all' => 'p.archived = 0',
             default => throw new Failure(422, 'invalid_status', 'Choose all, draft, published, or archived.'),
         };
-        $rows = $this->db->all(self::CURRENT . ' WHERE ' . $filter . ' AND (r.title LIKE :q OR r.slug LIKE :q) ORDER BY r.created_at DESC, p.id LIMIT 50 OFFSET :offset',
-            ['q' => '%' . mb_substr($search, 0, 100) . '%', 'offset' => self::offset($page)]);
-        return array_map(Page::fromRow(...), $rows);
+    }
+
+    /** @return Listing<PageSummary> */
+    public function browse(Caller $caller, string $status = 'all', string $search = '', int $page = 1, bool $includeBody = false): Listing
+    {
+        $caller->require('content:read');
+        $select = self::select(includeBody: $includeBody);
+        $rows = $this->db->all($select . ' WHERE ' . self::filter($status) . ' AND (r.title LIKE :q OR r.slug LIKE :q) ORDER BY r.created_at DESC, p.id LIMIT 51 OFFSET :offset',
+            ['q' => '%' . mb_substr($search, 0, 100) . '%', 'offset' => Listing::offset($page)]);
+        return new Listing(array_map($includeBody ? Page::fromRow(...) : PageSummary::fromRow(...), $rows), $page);
+    }
+
+    /** @return Listing<PageSummary> */
+    public function revisions(Caller $caller, string $id, int $page = 1, bool $includeBody = false): Listing
+    {
+        $caller->require('content:read');
+        $this->assertExists($id);
+        $rows = $this->db->all('SELECT p.id, r.version, p.published_version, p.archived, r.title, r.slug, r.excerpt, r.cover, r.actor, r.action, r.created_at'
+            . ($includeBody ? ', r.body' : '') . ' FROM revisions r JOIN pages p ON p.id = r.page_id WHERE p.id = :id ORDER BY r.version DESC LIMIT 51 OFFSET :offset',
+            ['id' => $id, 'offset' => Listing::offset($page)]);
+        return new Listing(array_map($includeBody ? Page::fromRow(...) : PageSummary::fromRow(...), $rows), $page);
+    }
+
+    public function revision(Caller $caller, string $id, int $version): Page
+    {
+        $caller->require('content:read');
+        $row = $this->db->one('SELECT p.id, r.version, p.published_version, p.archived, r.title, r.slug, r.excerpt, r.body, r.cover, r.actor, r.action, r.created_at FROM revisions r JOIN pages p ON p.id = r.page_id WHERE p.id = :id AND r.version = :version',
+            ['id' => $id, 'version' => $version]);
+        if ($row === null) {
+            throw new Failure(404, 'not_found', 'That revision does not exist.');
+        }
+        return Page::fromRow($row);
+    }
+
+    /** @return Listing<PageSummary> */
+    public function publication(int $page = 1): Listing
+    {
+        $rows = $this->db->all(self::select(published: true) . ' WHERE p.archived = 0 ORDER BY r.created_at DESC, p.id LIMIT 51 OFFSET :offset', ['offset' => Listing::offset($page)]);
+        return new Listing(array_map(PageSummary::fromRow(...), $rows), $page);
     }
 
     public function get(Caller $caller, string $id): Page
@@ -44,7 +92,7 @@ final readonly class Pages
         $this->load($id);
         return array_map(Page::fromRow(...), $this->db->all(
             'SELECT p.id, r.version, p.published_version, p.archived, r.title, r.slug, r.excerpt, r.body, r.cover, r.actor, r.action, r.created_at FROM revisions r JOIN pages p ON p.id = r.page_id WHERE p.id = :id ORDER BY r.version DESC LIMIT 50 OFFSET :offset',
-            ['id' => $id, 'offset' => self::offset($page)]));
+            ['id' => $id, 'offset' => Listing::offset($page)]));
     }
 
     public function create(Caller $caller, Draft $draft, bool $publish = false): Page
@@ -105,12 +153,12 @@ final readonly class Pages
     /** @return list<Page> */
     public function published(int $page = 1): array
     {
-        return array_map(Page::fromRow(...), $this->db->all(self::PUBLIC . ' WHERE p.archived = 0 ORDER BY r.created_at DESC, p.id LIMIT 50 OFFSET :offset', ['offset' => self::offset($page)]));
+        return array_map(Page::fromRow(...), $this->db->all(self::select(published: true, includeBody: true) . ' WHERE p.archived = 0 ORDER BY r.created_at DESC, p.id LIMIT 50 OFFSET :offset', ['offset' => Listing::offset($page)]));
     }
 
     public function publishedPage(string $slug): Page
     {
-        $row = $this->db->one(self::PUBLIC . ' WHERE p.archived = 0 AND p.published_slug = :slug', ['slug' => $slug]);
+        $row = $this->db->one(self::select(published: true, includeBody: true) . ' WHERE p.archived = 0 AND p.published_slug = :slug', ['slug' => $slug]);
         if ($row === null) {
             throw new Failure(404, 'not_found', 'This page is not published.');
         }
@@ -153,19 +201,18 @@ final readonly class Pages
 
     private function load(string $id): Page
     {
-        $row = $this->db->one(self::CURRENT . ' WHERE p.id = :id', ['id' => $id]);
+        $row = $this->db->one(self::select(includeBody: true) . ' WHERE p.id = :id', ['id' => $id]);
         if ($row === null) {
             throw new Failure(404, 'not_found', 'That page does not exist.');
         }
         return Page::fromRow($row);
     }
 
-    private static function offset(int $page): int
+    private function assertExists(string $id): void
     {
-        if ($page < 1 || $page > 1000000) {
-            throw new Failure(422, 'invalid_page', 'Choose a page number between 1 and 1000000.');
+        if ($this->db->one('SELECT id FROM pages WHERE id = :id', ['id' => $id]) === null) {
+            throw new Failure(404, 'not_found', 'That page does not exist.');
         }
-        return ($page - 1) * 50;
     }
 
     private function assertAvailable(Draft $draft, string $id): void

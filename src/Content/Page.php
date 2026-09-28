@@ -5,18 +5,21 @@ namespace StageCms\Content;
 
 use StageCms\Input;
 
-final readonly class Page
+final readonly class Page extends PageSummary
 {
     public function __construct(
-        public string $id,
+        string $id,
         public Draft $draft,
-        public int $version,
-        public ?int $publishedVersion,
-        public bool $archived,
-        public string $updatedAt,
-        public string $actor,
-        public string $action,
-    ) {}
+        int $version,
+        ?int $publishedVersion,
+        bool $archived,
+        string $updatedAt,
+        string $actor,
+        string $action,
+    ) {
+        parent::__construct($id, $draft->title, $draft->slug, $draft->excerpt, $draft->cover,
+            $version, $publishedVersion, $archived, $updatedAt, $actor, $action);
+    }
 
     /** @param array<string, mixed> $row */
     public static function fromRow(array $row): self
@@ -26,16 +29,9 @@ final readonly class Page
             $row['archived'] === 1, Input::text($row, 'created_at'), Input::text($row, 'actor'), Input::text($row, 'action'));
     }
 
-    public function status(): string
-    {
-        return $this->archived ? 'archived' : ($this->publishedVersion === null ? 'draft' : ($this->publishedVersion === $this->version ? 'published' : 'changed'));
-    }
-
     /** @return array<string, int|string|bool|null> */
     public function data(): array
     {
-        return array_merge($this->draft->data(), ['id' => $this->id, 'version' => $this->version,
-            'published_version' => $this->publishedVersion, 'archived' => $this->archived, 'status' => $this->status(),
-            'updated_at' => $this->updatedAt, 'actor' => $this->actor, 'action' => $this->action]);
+        return array_merge(parent::data(), ['body' => $this->draft->body]);
     }
 }

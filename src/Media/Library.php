@@ -7,6 +7,7 @@ use finfo;
 use Stage\Security\Caller;
 use StageCms\Failure;
 use StageCms\Infrastructure\Database;
+use StageCms\Listing;
 use Throwable;
 
 final readonly class Library
@@ -25,6 +26,15 @@ final readonly class Library
     {
         $caller->require('content:read');
         return array_map(Asset::fromRow(...), $this->db->all('SELECT * FROM media ORDER BY created_at DESC, id'));
+    }
+
+    /** @return Listing<Asset> */
+    public function browse(Caller $caller, string $search = '', int $page = 1): Listing
+    {
+        $caller->require('content:read');
+        $rows = $this->db->all('SELECT * FROM media WHERE name LIKE :q OR alt LIKE :q ORDER BY created_at DESC, id LIMIT 51 OFFSET :offset',
+            ['q' => '%' . mb_substr($search, 0, 100) . '%', 'offset' => Listing::offset($page)]);
+        return new Listing(array_map(Asset::fromRow(...), $rows), $page);
     }
 
     public function upload(Caller $caller, string $name, string $bytes, string $alt = ''): Asset

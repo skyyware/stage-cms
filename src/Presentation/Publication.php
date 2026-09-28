@@ -14,7 +14,8 @@ final readonly class Publication implements Theme
     public function index(int $page): Response
     {
         $settings = $this->cms->settings->get();
-        return Response::html((new View($settings['title']))->publication($this->cms->pages->published($page), $settings['description'], $page));
+        $pages = $this->cms->pages->publication($page);
+        return Response::html((new View($settings['title']))->publication($pages->items, $settings['description'], $page, $pages->nextPage !== null));
     }
 
     public function page(Page $page, bool $preview = false): Response

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace StageCms\Presentation;
 
 use StageCms\Content\Page;
+use StageCms\Content\PageSummary;
 use StageCms\Identity\Session;
 use StageCms\Input;
 use StageCms\Media\Asset;
@@ -49,7 +50,7 @@ final readonly class View
             <nav aria-label="Workspace">{$nav}</nav>
             <div class="sidebar-bottom"><a href="/" target="_blank" rel="noopener">View publication <span aria-hidden="true">↗</span></a>
             <a href="/admin/settings">Settings</a><form method="post" action="/admin/logout">{$csrf}<button class="link" type="submit">Sign out</button></form>
-            <span class="version">STAGE CMS / 0.2</span></div></aside>
+            <span class="version">STAGE CMS / 0.3</span></div></aside>
             <main id="main" class="main"><div class="topline"><span>WORKSPACE <span class="slash">/</span> {$site}</span><a href="/admin/help">A little guidance <span aria-hidden="true">↗</span></a></div>
             {$alerts}{$body}<footer class="app-footer"><span>A place for your next idea.</span><span>Made with Stage</span></footer></main></div>
             HTML);
@@ -61,7 +62,7 @@ final readonly class View
             . '</h1><p class="intro">' . self::e($description) . '</p></div>' . $action . '</header>';
     }
 
-    /** @param list<Page> $pages */
+    /** @param list<PageSummary> $pages */
     public function pages(array $pages, string $filter, string $search): string
     {
         $body = $this->heading('YOUR PUBLICATION', 'Room for good ideas.', 'Write, refine, and publish. One page at a time.',
@@ -82,14 +83,14 @@ final readonly class View
         $body .= '<div class="page-table"><div class="table-labels"><span>PAGE</span><span>STATUS</span><span>LAST EDITED</span><span></span></div>';
         foreach ($pages as $page) {
             $body .= '<a class="page-row" href="/admin/pages/' . $page->id . '"><div class="page-title"><span class="page-symbol" aria-hidden="true">▤</span><span><strong>'
-                . self::e($page->draft->title) . '</strong><small>/' . self::e($page->draft->slug) . '</small></span></div>'
+                . self::e($page->title) . '</strong><small>/' . self::e($page->slug) . '</small></span></div>'
                 . self::badge($page) . '<time datetime="' . self::e($page->updatedAt) . '">' . self::date($page->updatedAt)
                 . '</time><span class="row-arrow" aria-hidden="true">↗</span></a>';
         }
         return $body . '</div><p class="collection-note">' . count($pages) . ' ' . (count($pages) === 1 ? 'page' : 'pages') . ' in this view · Every saved change has a history.</p>';
     }
 
-    public static function badge(Page $page): string
+    public static function badge(PageSummary $page): string
     {
         return '<span class="badge ' . $page->status() . '"><span aria-hidden="true"></span>'
             . match ($page->status()) {'draft' => 'Draft', 'changed' => 'Unpublished edits', 'published' => 'Published', default => 'Archived'} . '</span>';
@@ -105,7 +106,7 @@ final readonly class View
         $action = '/admin/pages/' . $id;
         $version = Input::text($values, 'expected_version', (string) ($page->version ?? 1));
         $csrf = self::csrf($session);
-        $body = '<div class="editor-heading"><a class="back" href="/admin/pages">← All pages</a><div>'
+        $body = '<h1 class="sr-only">Edit page</h1><div class="editor-heading"><a class="back" href="/admin/pages">← All pages</a><div>'
             . ($page !== null ? self::badge($page) . '<span class="revision-label">Revision ' . $page->version . '</span>' : '<span class="badge draft">New draft</span>') . '</div></div>';
         if ($page?->archived) {
             return $body . $this->heading('IN THE ARCHIVE', $page->draft->title, 'Recover this page as a draft whenever you need it.')
@@ -121,6 +122,8 @@ final readonly class View
         foreach ($media as $asset) {
             $options .= '<option value="' . $asset->id . '"' . ($asset->id === $cover ? ' selected' : '') . '>' . self::e($asset->name) . '</option>';
         }
+        $coverControl = $media === [] ? '<input type="hidden" name="cover" value=""><p class="cover-empty">No cover selected</p>'
+            : '<img class="cover-preview" src="/media/' . $media[0]->id . '" alt="' . self::e($media[0]->alt) . '"><select id="cover" name="cover" aria-label="Cover image">' . $options . '</select>';
         $preview = $page === null ? '<span class="muted">Save to preview</span>' : '<a class="button quiet" href="' . $action . '/preview" target="_blank" rel="noopener">Preview <span aria-hidden="true">↗</span></a>';
         $publish = $page?->publishedVersion !== null ? 'Publish changes' : 'Publish page';
         $pending = $unsaved ? 'true' : 'false';
@@ -134,7 +137,7 @@ final readonly class View
             <div class="writing-bottom"><span data-word-count>Write at your own pace.</span><span data-save-state>No unsaved changes</span></div></section>
             <aside class="page-details"><h2>Page details</h2><label for="slug">Address</label><div class="slug-input"><span>/</span><input id="slug" name="slug" value="{$slug}" pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="120" placeholder="your-page" required data-slug></div><p class="field-hint">Lowercase letters, numbers, and hyphens.</p>
             <label for="excerpt">Summary <span>optional</span></label><textarea id="excerpt" name="excerpt" rows="4" maxlength="500" placeholder="A few words to invite the reader in.">{$excerpt}</textarea>
-            <label for="cover">Cover image <span>optional</span></label><select id="cover" name="cover">{$options}</select><a class="small-link" href="/admin/media" target="_blank" rel="noopener">Open media library ↗</a>
+            <div class="field-label">Cover image <span>optional</span></div>{$coverControl}<button class="button cover-choose" name="intent" value="cover">Save &amp; choose image</button><p class="field-hint">Your draft is saved before the image library opens.</p>
             <div class="detail-note"><span class="note-dot"></span><p>Saving keeps your work private. Publish when it feels ready.</p></div>
             </aside></div><div class="editor-actions"><div>{$preview}</div><div><button class="button" name="intent" value="save" data-save>Save draft</button><button class="button primary" name="intent" value="publish">{$publish} <span aria-hidden="true">↗</span></button></div></div></form>
             HTML;
@@ -149,7 +152,7 @@ final readonly class View
         return $body;
     }
 
-    /** @param list<Page> $revisions */
+    /** @param list<PageSummary> $revisions */
     public function history(Page $page, array $revisions, Session $session): string
     {
         $body = '<a class="back" href="/admin/pages/' . $page->id . '">← Back to page</a>'
@@ -157,9 +160,9 @@ final readonly class View
         $body .= '<p class="intro">Restore any version as a new draft. Your published page stays as it is.</p><div class="history-list">';
         foreach ($revisions as $revision) {
             $body .= '<article class="history-item"><div><span class="eyebrow">REVISION ' . $revision->version . ' · ' . self::e(strtoupper($revision->action))
-                . '</span><h2>' . self::e($revision->draft->title) . '</h2><p>' . self::date($revision->updatedAt) . ' · '
-                . (str_starts_with($revision->actor, 'agent:') ? 'Agent' : 'Owner') . '</p><details><summary>Read this version</summary><div class="prose">'
-                . $this->markdown->render($revision->draft->body) . '</div></details></div>';
+                . '</span><h2>' . self::e($revision->title) . '</h2><p>' . self::date($revision->updatedAt) . ' · '
+                . (str_starts_with($revision->actor, 'agent:') ? 'Agent' : 'Owner') . '</p><a class="small-link" href="/admin/pages/' . $page->id . '/history/' . $revision->version
+                . '">Read revision ' . $revision->version . ' ↗</a></div>';
             if ($revision->version !== $page->version && !$page->archived) {
                 $body .= '<form method="post" action="/admin/pages/' . $page->id . '/restore">' . self::csrf($session)
                     . '<input type="hidden" name="expected_version" value="' . $page->version . '"><input type="hidden" name="revision" value="' . $revision->version . '"><button class="button">Restore draft</button></form>';
@@ -171,8 +174,49 @@ final readonly class View
         return $body . '</div>';
     }
 
+    public function revision(Page $current, Page $revision, Session $session): string
+    {
+        $action = $revision->version !== $current->version && !$current->archived
+            ? '<form method="post" action="/admin/pages/' . $current->id . '/restore">' . self::csrf($session)
+                . '<input type="hidden" name="expected_version" value="' . $current->version . '"><input type="hidden" name="revision" value="' . $revision->version . '"><button class="button">Restore as draft</button></form>'
+            : '';
+        return '<a class="back" href="/admin/pages/' . $current->id . '/history">← Version history</a>'
+            . $this->heading('REVISION ' . $revision->version, $revision->title, 'Saved ' . $revision->updatedAt . '. Restoring keeps the current publication live.', $action)
+            . '<article class="revision-reading prose">' . $this->markdown->render($revision->draft->body) . '</article>';
+    }
+
     /** @param list<Asset> $assets */
-    public function media(array $assets, Session $session): string
+    public function cover(Page $page, array $assets, Session $session, string $search): string
+    {
+        $path = '/admin/pages/' . $page->id . '/cover';
+        $body = '<a class="back" href="/admin/pages/' . $page->id . '">← Back to page</a>'
+            . $this->heading('COVER IMAGE', 'Find the right image.', 'For ' . $page->title . '. Your saved draft stays private until you publish.')
+            . self::mediaSearch($path, $search);
+        if ($assets === []) {
+            return $body . '<section class="empty"><h2>' . ($search === '' ? 'Your library is waiting.' : 'No matching images.')
+                . '</h2><p>' . ($search === '' ? 'Add an image to use it as a cover.' : 'Search by filename or image description.')
+                . '</p><a class="button" href="/admin/media" target="_blank" rel="noopener">Open media library ↗</a></section>';
+        }
+        $body .= '<div class="media-grid cover-grid">';
+        foreach ($assets as $asset) {
+            $body .= '<form class="media-card cover-card" method="post" action="' . $path . '">' . self::csrf($session)
+                . '<input type="hidden" name="expected_version" value="' . $page->version . '"><input type="hidden" name="cover" value="' . $asset->id . '">'
+                . '<button class="cover-option" aria-label="Use ' . self::e($asset->name) . ' as cover"><img src="/media/' . $asset->id . '" alt="' . self::e($asset->alt) . '" loading="lazy" width="' . $asset->width . '" height="' . $asset->height
+                . '"><span><strong>' . self::e($asset->name) . '</strong><small>' . $asset->width . ' × ' . $asset->height . '</small><span class="cover-action">'
+                . ($asset->id === $page->cover ? 'Current cover' : 'Use as cover ↗') . '</span></span></button></form>';
+        }
+        return $body . '</div>';
+    }
+
+    private static function mediaSearch(string $path, string $search): string
+    {
+        return '<form class="search media-search" action="' . self::e($path) . '"><label class="sr-only" for="media-search">Search images</label>'
+            . '<input id="media-search" name="q" value="' . self::e($search) . '" placeholder="Find an image by name or description…" maxlength="100">'
+            . '<button type="submit" aria-label="Search images">⌕</button></form>';
+    }
+
+    /** @param list<Asset> $assets */
+    public function media(array $assets, Session $session, string $search = ''): string
     {
         $csrf = self::csrf($session);
         $body = $this->heading('THE VISUAL SIDE', 'Worth a thousand words.', 'A home for the images that make your pages yours.');
@@ -181,8 +225,10 @@ final readonly class View
             <div><label for="image">Add an image</label><input id="image" type="file" name="image" accept="image/jpeg,image/png,image/webp" required><p class="field-hint">JPEG, PNG, or WebP · Up to 5 MB and 16 megapixels</p></div>
             <div><label for="upload-alt">Describe it <span>for readers using assistive technology</span></label><input id="upload-alt" name="alt" maxlength="300" placeholder="What does the image show?"></div><button class="button primary">Upload image</button></form>
             HTML;
+        $body .= self::mediaSearch('/admin/media', $search);
         if ($assets === []) {
-            return $body . '<section class="empty"><span class="empty-mark" aria-hidden="true">◫</span><h2>A fresh canvas.</h2><p>Images stay private until a published page uses them.</p></section>';
+            return $body . '<section class="empty"><span class="empty-mark" aria-hidden="true">◫</span><h2>' . ($search === '' ? 'A fresh canvas.' : 'No matching images.')
+                . '</h2><p>' . ($search === '' ? 'Images stay private until a published page uses them.' : 'Try another filename or description.') . '</p></section>';
         }
         $body .= '<div class="media-grid">';
         foreach ($assets as $asset) {
@@ -213,7 +259,7 @@ final readonly class View
         }
         $body .= '</fieldset><label for="days">Expires in</label><select id="days" name="days"><option value="30">30 days</option><option value="90" selected>90 days</option><option value="365">1 year</option></select>'
             . '<button class="button primary">Create connection</button></form></section><aside class="agent-note"><span class="large-symbol" aria-hidden="true">✳</span><h2>A shared workspace.<br>A clear boundary.</h2><p>People and agents work on the same pages. Every content change is recorded. Publishing is a separate permission.</p>'
-            . '<p>Agents cannot change your settings, password, or other connections.</p><a href="/api/schema" target="_blank" rel="noopener">Read the API schema ↗</a><a href="/llms.txt" target="_blank" rel="noopener">Agent quick start ↗</a></aside></div>'
+            . '<p>Agents cannot change your settings, password, or other connections.</p><a href="/api/schema" target="_blank" rel="noopener">Read the API schema ↗</a><a href="/api/guide" target="_blank" rel="noopener">Agent quick start ↗</a></aside></div>'
             . '<h2 class="section-title">Connections</h2><div class="connections">';
         if ($tokens === []) {
             $body .= '<p class="muted">No connections yet. Your workspace is yours.</p>';
@@ -269,8 +315,8 @@ final readonly class View
             . '<p><a href="https://github.com/skyyware/stage-cms">Documentation and source ↗</a></p></div>';
     }
 
-    /** @param list<Page> $pages */
-    public function publication(array $pages, string $description, int $number = 1): string
+    /** @param list<PageSummary> $pages */
+    public function publication(array $pages, string $description, int $number = 1, ?bool $hasMore = null): string
     {
         $body = '<header class="publication-header"><a href="/">' . self::e($this->siteTitle) . '</a><span>A PUBLICATION</span></header><main id="main" class="publication-home">'
             . '<p class="eyebrow">NOTES, IDEAS & EVERYTHING BETWEEN</p><h1>' . self::e($this->siteTitle) . '</h1><p class="publication-intro">' . self::e($description) . '</p><div class="publication-grid">';
@@ -278,12 +324,12 @@ final readonly class View
             $body .= '<p class="muted">Something worth reading is on its way.</p>';
         }
         foreach ($pages as $page) {
-            $body .= '<article><a href="/' . self::e($page->draft->slug) . '">'
-                . ($page->draft->cover !== null ? '<img class="story-cover" src="/media/' . $page->draft->cover . '" alt="" loading="lazy">' : '<div class="story-type"><span>FIELD NOTES</span><span>↗</span></div>')
-                . '<time datetime="' . self::e($page->updatedAt) . '">' . self::date($page->updatedAt) . '</time><h2>' . self::e($page->draft->title)
-                . '</h2><p>' . self::e($page->draft->excerpt) . '</p><span class="read-story">Read the story ↗</span></a></article>';
+            $body .= '<article><a href="/' . self::e($page->slug) . '">'
+                . ($page->cover !== null ? '<img class="story-cover" src="/media/' . $page->cover . '" alt="" loading="lazy">' : '<div class="story-type"><span>FIELD NOTES</span><span>↗</span></div>')
+                . '<time datetime="' . self::e($page->updatedAt) . '">' . self::date($page->updatedAt) . '</time><h2>' . self::e($page->title)
+                . '</h2><p>' . self::e($page->excerpt) . '</p><span class="read-story">Read the story ↗</span></a></article>';
         }
-        return $this->document($this->siteTitle, $body . '</div>' . self::pagination('/', $number, count($pages)) . '</main>' . $this->publicFooter(), 'publication');
+        return $this->document($this->siteTitle, $body . '</div>' . self::pagination('/', $number, count($pages), hasMore: $hasMore) . '</main>' . $this->publicFooter(), 'publication');
     }
 
     public function story(Page $page, bool $preview = false, string $coverAlt = ''): string
@@ -315,13 +361,13 @@ final readonly class View
     }
 
     /** @param array<string, string> $query */
-    public static function pagination(string $path, int $page, int $count, array $query = []): string
+    public static function pagination(string $path, int $page, int $count, array $query = [], ?bool $hasMore = null): string
     {
         $body = '';
         if ($page > 1) {
             $body .= '<a href="' . self::e($path . '?' . http_build_query(array_merge($query, ['page' => $page - 1]))) . '">← Previous</a>';
         }
-        if ($count === 50) {
+        if ($hasMore ?? $count === 50) {
             $body .= '<a href="' . self::e($path . '?' . http_build_query(array_merge($query, ['page' => $page + 1]))) . '">Next →</a>';
         }
         return $body === '' ? '' : '<nav class="pagination" aria-label="Pagination">' . $body . '</nav>';

@@ -373,7 +373,133 @@ final class CmsTest extends TestCase
     {
         $reflection = new \ReflectionClass(\Stage\Http\Application::class);
         self::assertSame(realpath(dirname(__DIR__) . '/vendor/skyyware/stage/src/Http/Application.php'), $reflection->getFileName());
-        self::assertSame('0.1.0.0', \Composer\InstalledVersions::getVersion('skyyware/stage'));
+        self::assertSame('0.1.1.0', \Composer\InstalledVersions::getVersion('skyyware/stage'));
+    }
+
+    public function testCompactListsHaveExactPaginationAndExplicitFullContent(): void
+    {
+        for ($index = 1; $index <= 50; $index++) {
+            $this->cms->pages->create($this->owner, $this->draft('Page ' . $index, 'page-' . $index, 'PRIVATE_BODY_' . $index), true);
+        }
+        $listing = $this->cms->pages->browse($this->owner);
+        self::assertCount(50, $listing->items);
+        self::assertNull($listing->nextPage);
+        self::assertArrayNotHasKey('body', $listing->items[0]->data());
+        self::assertNull($this->cms->pages->publication()->nextPage);
+        $last = $this->cms->pages->create($this->owner, $this->draft('Older page', 'older-page', 'FULL_BODY'));
+        self::assertSame(2, $this->cms->pages->browse($this->owner)->nextPage);
+        self::assertCount(1, $this->cms->pages->browse($this->owner, page: 2)->items);
+        self::assertNull($this->cms->pages->browse($this->owner, page: 2)->nextPage);
+        $secret = $this->cms->identity->createToken($this->owner, 'Reader', ['content:read']);
+        $headers = ['authorization' => 'Bearer ' . $secret];
+        $kernel = new Kernel($this->cms);
+        $summary = $kernel->handle(new Request('GET', '/api/pages', headers: $headers, query: 'q=older-page'));
+        self::assertStringNotContainsString('FULL_BODY', $summary->body);
+        self::assertStringContainsString('FULL_BODY', $kernel->handle(new Request('GET', '/api/pages', headers: $headers, query: 'q=older-page&include=body'))->body);
+        self::assertStringContainsString('FULL_BODY', $kernel->handle(new Request('GET', '/api/pages/' . $last->id, headers: $headers))->body);
+        self::assertSame(422, $kernel->handle(new Request('GET', '/api/pages', headers: $headers, query: 'include=unknown'))->status);
+        self::assertSame(422, $kernel->handle(new Request('GET', '/api/pages', headers: $headers, query: 'page=0'))->status);
+        $this->expectException(Forbidden::class);
+        $this->cms->pages->browse(new Caller(null));
+    }
+
+    public function testRevisionBodiesLoadIndividuallyAndStayPrivate(): void
+    {
+        $page = $this->cms->pages->create($this->owner, $this->draft(body: 'PRIVATE_REVISION_ONE'));
+        for ($index = 2; $index <= 50; $index++) {
+            $page = $this->cms->pages->save($this->owner, $page->id, $this->draft(body: 'PRIVATE_REVISION_' . $index), $page->version);
+        }
+        $listing = $this->cms->pages->revisions($this->owner, $page->id);
+        self::assertCount(50, $listing->items);
+        self::assertNull($listing->nextPage);
+        self::assertArrayNotHasKey('body', $listing->items[0]->data());
+        self::assertSame('PRIVATE_REVISION_ONE', $this->cms->pages->revision($this->owner, $page->id, 1)->draft->body);
+        $kernel = new Kernel($this->cms);
+        $session = $this->cms->identity->newSession(true);
+        $headers = ['cookie' => 'stage_cms=' . $session->secret];
+        $path = '/admin/pages/' . $page->id . '/history';
+        $history = $kernel->handle(new Request('GET', $path, headers: $headers));
+        self::assertStringNotContainsString('PRIVATE_REVISION_', $history->body);
+        self::assertStringNotContainsString('page=2', $history->body);
+        self::assertStringContainsString('PRIVATE_REVISION_ONE', $kernel->handle(new Request('GET', $path . '/1', headers: $headers))->body);
+        self::assertSame(303, $kernel->handle(new Request('GET', $path . '/1'))->status);
+        self::assertSame(401, $kernel->handle(new Request('GET', '/api/pages/' . $page->id . '/history/1'))->status);
+        $token = $this->cms->identity->createToken($this->owner, 'Reader', ['content:read']);
+        $response = $kernel->handle(new Request('GET', '/api/pages/' . $page->id . '/history/1', headers: ['authorization' => 'Bearer ' . $token]));
+        self::assertSame(200, $response->status);
+        self::assertStringContainsString('PRIVATE_REVISION_ONE', $response->body);
+        $this->fails('not_found', fn () => $this->cms->pages->revision($this->owner, $page->id, 51));
+    }
+
+    public function testMediaSearchPaginationAndCoverSelectionPreservePublication(): void
+    {
+        $assets = [];
+        $bytes = $this->png();
+        for ($index = 1; $index <= 51; $index++) {
+            $assets[] = $this->cms->media->upload($this->owner, 'Image ' . $index . '.png', $bytes, $index === 51 ? 'Searchable amber cover' : '');
+        }
+        $first = $this->cms->media->browse($this->owner);
+        $second = $this->cms->media->browse($this->owner, page: 2);
+        self::assertCount(50, $first->items);
+        self::assertSame(2, $first->nextPage);
+        self::assertCount(1, $second->items);
+        self::assertNull($second->nextPage);
+        self::assertNotContains($second->items[0]->id, array_map(fn ($asset) => $asset->id, $first->items));
+        $found = $this->cms->media->browse($this->owner, 'amber');
+        self::assertSame($assets[50]->id, $found->items[0]->id);
+        self::assertNull($found->nextPage);
+        $page = $this->cms->pages->create($this->owner, $this->draft(body: 'Original publication'), true);
+        $session = $this->cms->identity->newSession(true);
+        $headers = ['cookie' => 'stage_cms=' . $session->secret];
+        $kernel = new Kernel($this->cms);
+        $path = '/admin/pages/' . $page->id;
+        $values = array_merge($this->draft(body: 'Work before choosing')->data(), ['csrf' => $session->csrf, 'expected_version' => 1, 'intent' => 'cover']);
+        $saved = $kernel->handle(new Request('POST', $path, http_build_query($values), $headers));
+        self::assertSame($path . '/cover', $saved->headers['location']);
+        $picker = $kernel->handle(new Request('GET', $path . '/cover', headers: $headers, query: 'q=amber'));
+        self::assertSame(200, $picker->status);
+        self::assertStringContainsString('Image 51.png', $picker->body);
+        self::assertStringNotContainsString('Image 1.png', $picker->body);
+        $choice = http_build_query(['csrf' => $session->csrf, 'expected_version' => 2, 'cover' => $assets[50]->id]);
+        self::assertSame(303, $kernel->handle(new Request('POST', $path . '/cover', $choice, $headers))->status);
+        $draft = $this->cms->pages->get($this->owner, $page->id);
+        self::assertSame('Work before choosing', $draft->draft->body);
+        self::assertSame($assets[50]->id, $draft->cover);
+        self::assertNull($this->cms->pages->publishedPage($page->slug)->cover);
+        self::assertSame('Original publication', $this->cms->pages->publishedPage($page->slug)->draft->body);
+        self::assertSame(409, $kernel->handle(new Request('POST', $path . '/cover', $choice, $headers))->status);
+        self::assertSame(403, $kernel->handle(new Request('POST', $path . '/cover', 'cover=' . $assets[0]->id, $headers))->status);
+        $editor = $kernel->handle(new Request('GET', $path, headers: $headers));
+        self::assertStringContainsString('Image 51.png', $editor->body);
+        self::assertStringNotContainsString('Image 1.png', $editor->body);
+    }
+
+    public function testWarmAgentReadsDoNotNeedTheDatabaseWriteLock(): void
+    {
+        $secret = $this->cms->identity->createToken($this->owner, 'Reader', ['content:read']);
+        $this->cms->identity->authenticateToken('Bearer ' . $secret);
+        $other = new Cms($this->cms->config);
+        $this->cms->db->pdo->exec('PRAGMA busy_timeout = 1');
+        $other->db->transaction(function () use ($secret): void {
+            $caller = $this->cms->identity->authenticateToken('Bearer ' . $secret);
+            $caller->require('content:read');
+            self::assertNotNull($caller->id);
+            self::assertStringStartsWith('agent:', $caller->id);
+        });
+        $token = $this->cms->identity->tokens($this->owner)[0];
+        self::assertNotNull($token['last_used']);
+        $this->cms->identity->revokeToken($this->owner, Input::text($token, 'id'));
+        $this->fails('unauthorized', fn () => $this->cms->identity->authenticateToken('Bearer ' . $secret));
+    }
+
+    public function testCmsAgentGuideHasItsOwnStableAddress(): void
+    {
+        $kernel = new Kernel($this->cms);
+        $guide = $kernel->handle(new Request('GET', '/api/guide'));
+        self::assertSame(200, $guide->status);
+        self::assertStringContainsString('Stage CMS', $guide->body);
+        self::assertSame($guide->body, $kernel->handle(new Request('GET', '/llms.txt'))->body);
+        self::assertSame(405, $kernel->handle(new Request('POST', '/api/guide'))->status);
     }
 
     public function testDataDirectoryCannotBePublic(): void

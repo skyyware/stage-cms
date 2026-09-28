@@ -1,7 +1,7 @@
 # Work through the API
 
 The running application serves [openapi.json](openapi.json) at `/api/schema`
-and the [agent guide](agents.txt) at `/llms.txt`. Both are public documentation.
+and the [agent guide](agents.txt) at `/api/guide`. Both are public documentation.
 All content API endpoints require a bearer token; a browser cookie does not
 authenticate the API.
 
@@ -13,7 +13,9 @@ php bin/cms token --name="Editorial assistant" --scopes=content:read,content:wri
 
 The token appears once. Only its hash is stored. Read access is always included.
 Publication requires both `content:write` and `content:publish`. Tokens cannot
-manage credentials, site settings, exports, or other tokens.
+manage credentials, site settings, exports, or other tokens. Credentials, expiry,
+and scopes are checked on every request. The displayed last-use time updates at
+most once per minute; revocation takes effect immediately.
 
 ## Create, edit, publish
 
@@ -61,9 +63,15 @@ creation at the same address. `GET /api/pages?q=hello-world` can locate it.
 ## Reading and recovery
 
 `GET /api/pages` accepts `status=all|draft|published|archived`, `q`, and `page`.
-`GET /api/pages/{id}/history` accepts `page`. Both return 50 items at most plus
-`next_page`. A full final page can point to an empty next page. Lists may move
-while writers work; they are not a transaction-wide snapshot.
+`GET /api/pages/{id}/history` accepts `page`. Both return summaries without `body`,
+50 items at most, the current `page`, and `next_page`. The latter is null when
+no further item exists at the time of the query. Lists may move while writers
+work; they are not a transaction-wide snapshot.
+
+Read full content with `GET /api/pages/{id}` or a specific saved revision with
+`GET /api/pages/{id}/history/{version}`. Add `include=body` to page or history
+lists when you need every body in that batch. Omit it when finding a page or
+choosing a revision. Create and update responses always include full content.
 
 `POST /api/pages/{id}/restore` takes `revision` and `expected_version`.
 It copies that content into a new draft. `unpublish`, `archive`, and `recover`
@@ -71,6 +79,9 @@ take `expected_version`. Archive removes the public page; recovery is private.
 The original history remains available.
 
 ## Media
+
+`GET /api/media` returns `media`, `page`, and `next_page`, with at most 50 images.
+Use `page` to continue and `q` to search filenames and descriptions.
 
 Upload JSON containing `name`, base64-encoded image bytes under `base64`, and
 optional `alt` to `POST /api/media`. Accepted types are JPEG, PNG, and WebP.
@@ -84,3 +95,10 @@ with a bearer token at `/media/{id}`.
 `PATCH /api/media/{id}` changes `alt`. This metadata change applies to any
 published cover using the image. `DELETE` refuses any image referenced in
 current content or history.
+
+## Upgrade from 0.2
+
+Page and history lists now omit `body` by default. Read individual pages or add
+`include=body` if an existing client depends on complete content in lists.
+Media lists are now paginated; follow `next_page` to reach every image.
+The database format, write requests, and individual page responses are unchanged.

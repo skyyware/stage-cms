@@ -1,0 +1,69 @@
+#!/usr/bin/env php
+<?php
+declare(strict_types=1);
+
+use Stage\Http\Request;
+use Stage\Security\Caller;
+use StageCms\Cms;
+use StageCms\Content\Draft;
+use StageCms\Http\Kernel;
+use StageCms\Identity\Identity;
+use StageCms\Infrastructure\Config;
+
+require dirname(__DIR__) . '/vendor/autoload.php';
+
+umask(0077);
+$root = dirname(__DIR__);
+$directory = $root . '/.runtime/benchmark-' . bin2hex(random_bytes(8));
+try {
+    $cms = new Cms(new Config($root, $directory));
+    $owner = new Caller('owner:1', Identity::PERMISSIONS);
+    $cms->identity->setup('Benchmark', 'benchmark@example.test', bin2hex(random_bytes(24)));
+    $body = str_repeat("A paragraph with **clear words** and a useful [link](https://example.test).\n\n", 1000);
+    for ($index = 0; $index < 100; $index++) {
+        $page = $cms->pages->create($owner, new Draft('Page ' . $index, 'page-' . $index, 'A summary.', $body), true);
+    }
+    for ($index = 0; $index < 49; $index++) {
+        $page = $cms->pages->save($owner, $page->id, $page->draft, $page->version);
+    }
+    $cms->db->transaction(function () use ($cms): void {
+        for ($index = 0; $index < 10000; $index++) {
+            $cms->db->execute('INSERT INTO media VALUES (:id, :name, :mime, 100, 10, 10, :alt, :sha, :created)',
+                ['id' => str_pad(dechex($index), 32, '0', STR_PAD_LEFT), 'name' => 'Image ' . $index . '.png', 'mime' => 'image/png', 'alt' => 'A benchmark image.', 'sha' => str_repeat('a', 64), 'created' => '2026-01-01T00:00:00+00:00']);
+        }
+    });
+    $session = $cms->identity->newSession(true);
+    $token = $cms->identity->createToken($owner, 'Benchmark', ['content:read']);
+    $kernel = new Kernel($cms);
+    $results = [];
+    foreach (['pages' => '/admin/pages', 'editor' => '/admin/pages/' . $page->id, 'history' => '/admin/pages/' . $page->id . '/history', 'media' => '/admin/media', 'agent_pages' => '/api/pages', 'agent_media' => '/api/media'] as $name => $path) {
+        $request = new Request('GET', $path, headers: ['cookie' => 'stage_cms=' . $session->secret, 'authorization' => 'Bearer ' . $token]);
+        $samples = [];
+        $peak = 0;
+        $bytes = 0;
+        for ($sample = 0; $sample < 3; $sample++) {
+            memory_reset_peak_usage();
+            $baseline = memory_get_usage();
+            $start = hrtime(true);
+            $response = $kernel->handle($request);
+            $samples[] = (hrtime(true) - $start) / 1000000;
+            $peak = max($peak, memory_get_peak_usage() - $baseline);
+            if ($response->status !== 200) {
+                throw new RuntimeException('Unexpected benchmark response for ' . $name);
+            }
+            $bytes = strlen($response->body);
+            unset($response);
+        }
+        sort($samples);
+        $results[$name] = ['median_ms' => round($samples[1], 3), 'response_bytes' => $bytes, 'peak_added_bytes' => $peak];
+    }
+    echo json_encode(['php' => PHP_VERSION, 'pages' => 100, 'revisions_on_one_page' => 50, 'body_bytes' => strlen($body), 'images' => 10000, 'samples' => 3, 'results' => $results], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR), PHP_EOL;
+} finally {
+    unset($kernel, $cms);
+    if (is_dir($directory)) {
+        foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory, FilesystemIterator::SKIP_DOTS), RecursiveIteratorIterator::CHILD_FIRST) as $file) {
+            $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
+        }
+        rmdir($directory);
+    }
+}

@@ -28,6 +28,11 @@ Use generous space around the editor, compact metadata, and visible keyboard
 focus. Status always has text as well as color. Preserve input when a save
 fails. Make a stale revision understandable without silently replacing work.
 
+The editor loads only its selected cover. Choosing another image saves the draft
+and opens a searchable visual library. History shows revision summaries first;
+opening one revision loads its reading view. Both collections have bounded
+pages, clear empty states, and real next-page links.
+
 On narrow screens, navigation becomes a compact top bar and the editor metadata
 moves below the writing area. Forms work without JavaScript. Enhancements add
 formatting shortcuts, keyboard saving, file selection feedback, and dirty-state

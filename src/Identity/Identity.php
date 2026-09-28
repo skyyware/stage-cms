@@ -119,7 +119,7 @@ final readonly class Identity
         if (!preg_match('/^Bearer (stg_[a-f0-9]{64})$/D', $authorization, $match)) {
             throw new Failure(401, 'unauthorized', 'Provide a valid bearer token.');
         }
-        $row = $this->db->one('SELECT id, scopes FROM tokens WHERE hash = :hash AND expires > :now AND revoked_at IS NULL',
+        $row = $this->db->one('SELECT id, scopes, last_used FROM tokens WHERE hash = :hash AND expires > :now AND revoked_at IS NULL',
             ['hash' => hash('sha256', $match[1]), 'now' => time()]);
         if ($row === null) {
             throw new Failure(401, 'unauthorized', 'This token is invalid, expired, or revoked.');
@@ -134,7 +134,11 @@ final readonly class Identity
             }
         }
         $id = Input::text($row, 'id');
-        $this->db->execute('UPDATE tokens SET last_used = :now WHERE id = :id', ['now' => gmdate('c'), 'id' => $id]);
+        $cutoff = gmdate('c', time() - 60);
+        if ($row['last_used'] === null || Input::text($row, 'last_used') < $cutoff) {
+            $this->db->execute('UPDATE tokens SET last_used = :now WHERE id = :id AND (last_used IS NULL OR last_used < :cutoff)',
+                ['now' => gmdate('c'), 'id' => $id, 'cutoff' => $cutoff]);
+        }
         return new Caller('agent:' . $id, $scopes);
     }
 

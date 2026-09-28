@@ -69,7 +69,7 @@ final readonly class Kernel
             }
             return new Response($bytes, 200, ['content-type' => $assets[$request->path]]);
         }
-        if (in_array($request->path, ['/health', '/api/schema', '/llms.txt'], true) && !in_array($request->method, ['GET', 'HEAD'], true)) {
+        if (in_array($request->path, ['/health', '/api/schema', '/api/guide', '/llms.txt'], true) && !in_array($request->method, ['GET', 'HEAD'], true)) {
             return new Response('', 405, ['allow' => 'GET, HEAD']);
         }
         if ($request->path === '/health') {
@@ -82,7 +82,7 @@ final readonly class Kernel
             }
             return new Response($schema, 200, ['content-type' => 'application/json']);
         }
-        if ($request->path === '/llms.txt') {
+        if (in_array($request->path, ['/api/guide', '/llms.txt'], true)) {
             $guide = file_get_contents(dirname(__DIR__, 2) . '/docs/agents.txt');
             if ($guide === false) {
                 throw new \RuntimeException('Missing agent guide.');
@@ -101,6 +101,7 @@ final readonly class Kernel
                 new Route('GET', '/api/pages/{id}', $api->page(...)),
                 new Route('PUT', '/api/pages/{id}', $api->page(...)),
                 new Route('GET', '/api/pages/{id}/history', $api->history(...)),
+                new Route('GET', '/api/pages/{id}/history/{version}', $api->revision(...)),
                 new Route('POST', '/api/pages/{id}/{action}', $api->change(...)),
                 new Route('GET', '/api/media', $api->media(...)),
                 new Route('POST', '/api/media', $api->media(...)),
@@ -134,6 +135,9 @@ final readonly class Kernel
                 new Route('GET', '/admin/pages/{id}', $web->editor(...)),
                 new Route('POST', '/admin/pages/{id}', $web->editor(...)),
                 new Route('GET', '/admin/pages/{id}/history', $web->history(...)),
+                new Route('GET', '/admin/pages/{id}/history/{version}', $web->revision(...)),
+                new Route('GET', '/admin/pages/{id}/cover', $web->cover(...)),
+                new Route('POST', '/admin/pages/{id}/cover', $web->cover(...)),
                 new Route('GET', '/admin/pages/{id}/preview', $web->preview(...)),
                 new Route('POST', '/admin/pages/{id}/{action}', $web->change(...)),
                 new Route('GET', '/admin/media', $web->media(...)),

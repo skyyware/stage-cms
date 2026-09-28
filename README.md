@@ -7,7 +7,7 @@ Stage CMS is an MIT-licensed PHP application built on the
 Agents use the API. Both work with the same content operations, permissions,
 and version history.
 
-**Version 0.2 is an early, working release for one publication and one owner.**
+**Version 0.3 is an early, working release for one publication and one owner.**
 It includes pages, Markdown editing, private previews, publication, revision
 restoration, an image library, agent connections, and portable export/restore.
 The API and database format may change before 1.0.
@@ -20,7 +20,7 @@ Requires PHP 8.4 or 8.5, Composer 2, and the Fileinfo, GD with JPEG/PNG/WebP,
 Mbstring, PDO SQLite, and Zip extensions.
 
 ```sh
-composer create-project skyyware/stage-cms my-site "^0.2"
+composer create-project skyyware/stage-cms my-site "^0.3"
 cd my-site
 php bin/cms setup --name="Your name" --email="you@example.com"
 composer serve
@@ -43,9 +43,10 @@ Read the [deployment guide](docs/operations.md) before using a public server.
 4. Use history to restore an earlier version as a new draft.
 5. Unpublish or archive a page. Recover an archived page whenever needed.
 
-Upload images from Media, describe them, then select a cover or insert an image
-address in Markdown. Images remain private until a published page references
-them. Deleting an image used by any revision is refused.
+Upload images from Media and describe them. In the editor, **Save & choose image**
+saves your draft and opens a searchable cover picker. You can also insert an
+image address in Markdown. Images remain private until a published page
+references them. Deleting an image used by any revision is refused.
 
 Settings contains the publication name, description, and a ZIP export of
 content, revisions, and images. Exports exclude passwords and agent tokens.
@@ -68,7 +69,8 @@ grant permissions, change credentials, or override the application's rules.
 
 The [agent guide](docs/agents.txt), [API guide](docs/api.md), and
 [OpenAPI schema](docs/openapi.json) describe the full interface. Running
-instances serve them at `/llms.txt` and `/api/schema`. The CMS does not require
+instances serve the guide at `/api/guide` and the schema at `/api/schema`.
+Standalone installations also serve the guide at `/llms.txt`. The CMS does not require
 a particular model, agent provider, or MCP server.
 
 ## One application you can own
@@ -92,11 +94,17 @@ when working on the application source.
 ```sh
 composer check
 php bin/cms help
+php bin/benchmark
 ```
 
 Checks validate package metadata, PHPStan at its strictest level, and behavior
 tests. CI runs on PHP 8.4 and 8.5. Browser verification should cover a complete
 publishing workflow at desktop and mobile widths.
+
+The benchmark creates isolated fixtures for 100 pages, 50 revisions, and 10,000
+image records, then removes them. It reports PHP request handling time, response
+size, and memory for the workspace and API. It does not measure image transfer,
+network latency, concurrent traffic, or production capacity.
 
 Bug reports, documentation fixes, accessibility improvements, and focused pull
 requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and
@@ -110,8 +118,8 @@ custom content types, plugins, or real-time collaboration. Pages have one
 lowercase URL segment. Markdown accepts no raw HTML. External images are
 blocked by the content security policy; upload them to the library.
 
-Page lists and history use 50-item pagination. The image picker and library
-load all image metadata and suit a small publication. Images are limited to
+Pages, history, and images use 50-item pagination. Lists read summaries; complete
+content loads when opened or explicitly requested through the API. Images are limited to
 5 MiB and 16 megapixels; bodies to 200 KB. Portable exports are limited to
 128 MiB uncompressed. Large installations need their own measured capacity and
 backup plan. No horizontal write scaling or independent security audit is

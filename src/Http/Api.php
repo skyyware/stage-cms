@@ -22,9 +22,9 @@ final readonly class Api
         }
         $query = $this->context->query();
         $number = Input::integer($query['page'] ?? 1);
-        $pages = $this->cms->pages->list($this->caller, Input::text($query, 'status', 'all'), Input::text($query, 'q', ''), $number);
+        $pages = $this->cms->pages->browse($this->caller, Input::text($query, 'status', 'all'), Input::text($query, 'q', ''), $number, $this->includeBody());
         return Response::json(['pages' => array_map(fn ($page) => $page->data(),
-            $pages), 'page' => $number, 'next_page' => count($pages) === 50 ? $number + 1 : null]);
+            $pages->items), 'page' => $number, 'next_page' => $pages->nextPage]);
     }
 
     public function page(Request $request): Response
@@ -41,9 +41,23 @@ final readonly class Api
     public function history(Request $request): Response
     {
         $number = Input::integer($this->context->query()['page'] ?? 1);
-        $revisions = $this->cms->pages->history($this->caller, $request->parameters['id'], $number);
-        return Response::json(['revisions' => array_map(fn ($page) => $page->data(), $revisions),
-            'page' => $number, 'next_page' => count($revisions) === 50 ? $number + 1 : null]);
+        $revisions = $this->cms->pages->revisions($this->caller, $request->parameters['id'], $number, $this->includeBody());
+        return Response::json(['revisions' => array_map(fn ($page) => $page->data(), $revisions->items),
+            'page' => $number, 'next_page' => $revisions->nextPage]);
+    }
+
+    public function revision(Request $request): Response
+    {
+        return Response::json($this->cms->pages->revision($this->caller, $request->parameters['id'], Input::integer($request->parameters['version']))->data());
+    }
+
+    private function includeBody(): bool
+    {
+        return match (Input::text($this->context->query(), 'include', '')) {
+            '' => false,
+            'body' => true,
+            default => throw new Failure(422, 'invalid_include', 'Use include=body for full content, or omit include for summaries.'),
+        };
     }
 
     public function change(Request $request): Response
@@ -65,7 +79,9 @@ final readonly class Api
     public function media(Request $request): Response
     {
         if ($request->method === 'GET' || $request->method === 'HEAD') {
-            return Response::json(['media' => array_map(fn ($asset) => $asset->data(), $this->cms->media->list($this->caller))]);
+            $query = $this->context->query();
+            $media = $this->cms->media->browse($this->caller, Input::text($query, 'q', ''), Input::integer($query['page'] ?? 1));
+            return Response::json(['media' => array_map(fn ($asset) => $asset->data(), $media->items), 'page' => $media->number, 'next_page' => $media->nextPage]);
         }
         $input = $this->context->json(['name', 'base64', 'alt']);
         $bytes = base64_decode(Input::text($input, 'base64'), true);

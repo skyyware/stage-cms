@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "1235c1d27839118094ff34b33c3b1fbf",
+    "content-hash": "c23348194440039bf3fa4037b99c7036",
     "packages": [
         {
             "name": "dflydev/dot-access-data",
@@ -480,16 +480,16 @@
         },
         {
             "name": "skyyware/stage",
-            "version": "v0.1.0",
+            "version": "v0.1.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/skyyware/stage.git",
-                "reference": "672668ed77e433da4cccb1b85258adf86b4cb3a8"
+                "reference": "f2a535f202416363aab2ee7bf544671ae24f85ff"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/skyyware/stage/zipball/672668ed77e433da4cccb1b85258adf86b4cb3a8",
-                "reference": "672668ed77e433da4cccb1b85258adf86b4cb3a8",
+                "url": "https://api.github.com/repos/skyyware/stage/zipball/f2a535f202416363aab2ee7bf544671ae24f85ff",
+                "reference": "f2a535f202416363aab2ee7bf544671ae24f85ff",
                 "shasum": ""
             },
             "require": {
@@ -524,7 +524,7 @@
                 "issues": "https://github.com/skyyware/stage/issues",
                 "source": "https://github.com/skyyware/stage"
             },
-            "time": "2026-09-28T15:56:53+00:00"
+            "time": "2026-09-28T19:24:03+00:00"
         },
         {
             "name": "symfony/deprecation-contracts",

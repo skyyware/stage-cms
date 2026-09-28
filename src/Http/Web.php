@@ -52,9 +52,9 @@ final readonly class Web
         $filter = Input::text($input, 'status', 'all');
         $query = Input::text($input, 'q', '');
         $number = Input::integer($input['page'] ?? 1);
-        $pages = $this->cms->pages->list($this->session->caller(), $filter, $query, $number);
-        return $this->shell('Pages', 'pages', $this->view->pages($pages, $filter, $query)
-            . View::pagination('/admin/pages', $number, count($pages), ['status' => $filter, 'q' => $query]));
+        $pages = $this->cms->pages->browse($this->session->caller(), $filter, $query, $number);
+        return $this->shell('Pages', 'pages', $this->view->pages($pages->items, $filter, $query)
+            . View::pagination('/admin/pages', $number, count($pages->items), ['status' => $filter, 'q' => $query], $pages->nextPage !== null));
     }
 
     public function editor(Request $request): Response
@@ -68,16 +68,26 @@ final readonly class Web
             $values = $this->context->form();
             try {
                 $draft = Draft::fromInput($values);
-                $publish = Input::text($values, 'intent', 'save') === 'publish';
+                $intent = Input::text($values, 'intent', 'save');
+                $publish = $intent === 'publish';
                 $saved = $page === null ? $this->cms->pages->create($this->session->caller(), $draft, $publish)
                     : $this->cms->pages->save($this->session->caller(), $id, $draft, Input::integer($values['expected_version'] ?? null), $publish);
-                return self::redirect('/admin/pages/' . $saved->id . '?notice=' . ($publish ? 'published' : 'saved'));
+                return self::redirect('/admin/pages/' . $saved->id . ($intent === 'cover' ? '/cover' : '?notice=' . ($publish ? 'published' : 'saved')));
             } catch (Failure $failure) {
                 $error = $failure->getMessage();
                 $status = $failure->status;
             }
         }
-        $body = $this->view->editor($page, $values, $this->cms->media->list($this->session->caller()), $this->session, $status !== 200);
+        $cover = Input::text($values, 'cover', '');
+        $media = [];
+        if ($cover !== '') {
+            try {
+                $media[] = $this->cms->media->get($cover);
+            } catch (Failure) {
+                $values['cover'] = '';
+            }
+        }
+        $body = $this->view->editor($page, $values, $media, $this->session, $status !== 200);
         if ($status === 409 && $page !== null) {
             $body = '<p class="conflict-link"><a href="/admin/pages/' . $page->id . '" target="_blank" rel="noopener">Open the latest version in another tab ↗</a></p>' . $body;
         }
@@ -103,9 +113,32 @@ final readonly class Web
     {
         $page = $this->cms->pages->get($this->session->caller(), $request->parameters['id']);
         $number = Input::integer($this->context->query()['page'] ?? 1);
-        $history = $this->cms->pages->history($this->session->caller(), $page->id, $number);
-        return $this->shell('History', 'pages', $this->view->history($page, $history, $this->session)
-            . View::pagination('/admin/pages/' . $page->id . '/history', $number, count($history)));
+        $history = $this->cms->pages->revisions($this->session->caller(), $page->id, $number);
+        return $this->shell('History', 'pages', $this->view->history($page, $history->items, $this->session)
+            . View::pagination('/admin/pages/' . $page->id . '/history', $number, count($history->items), hasMore: $history->nextPage !== null));
+    }
+
+    public function revision(Request $request): Response
+    {
+        $page = $this->cms->pages->get($this->session->caller(), $request->parameters['id']);
+        $revision = $this->cms->pages->revision($this->session->caller(), $page->id, Input::integer($request->parameters['version']));
+        return $this->shell('Revision ' . $revision->version, 'pages', $this->view->revision($page, $revision, $this->session));
+    }
+
+    public function cover(Request $request): Response
+    {
+        $page = $this->cms->pages->get($this->session->caller(), $request->parameters['id']);
+        if ($request->method === 'POST') {
+            $input = $this->context->form();
+            $draft = new Draft($page->title, $page->slug, $page->excerpt, $page->draft->body, Input::optional($input, 'cover'));
+            $this->cms->pages->save($this->session->caller(), $page->id, $draft, Input::integer($input['expected_version'] ?? null));
+            return self::redirect('/admin/pages/' . $page->id . '?notice=saved');
+        }
+        $query = $this->context->query();
+        $search = Input::text($query, 'q', '');
+        $media = $this->cms->media->browse($this->session->caller(), $search, Input::integer($query['page'] ?? 1));
+        return $this->shell('Choose a cover', 'pages', $this->view->cover($page, $media->items, $this->session, $search)
+            . View::pagination('/admin/pages/' . $page->id . '/cover', $media->number, count($media->items), ['q' => $search], $media->nextPage !== null));
     }
 
     public function preview(Request $request): Response
@@ -131,7 +164,11 @@ final readonly class Web
                 $status = $failure->status;
             }
         }
-        return $this->shell('Media', 'media', $this->view->media($this->cms->media->list($this->session->caller()), $this->session), $error, $status);
+        $query = $this->context->query();
+        $search = Input::text($query, 'q', '');
+        $media = $this->cms->media->browse($this->session->caller(), $search, Input::integer($query['page'] ?? 1));
+        return $this->shell('Media', 'media', $this->view->media($media->items, $this->session, $search)
+            . View::pagination('/admin/media', $media->number, count($media->items), ['q' => $search], $media->nextPage !== null), $error, $status);
     }
 
     public function image(Request $request): Response

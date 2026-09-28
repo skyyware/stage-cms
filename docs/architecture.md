@@ -36,6 +36,19 @@ Runtime is outside public/ and Git. SQLite uses foreign keys, WAL, a busy timeou
 and immediate write transactions. Images use generated names and validated
 content types. The public site reads published revisions only.
 
+Workspace and API lists select metadata without Markdown bodies. A bounded
+query reads one extra row to determine whether a next page exists. Individual
+reads load complete content. The PHP operations `Pages::browse()`,
+`Pages::revisions()`, `Pages::publication()`, and `Library::browse()` return a
+`Listing` with `items`, `number`, and `nextPage`. Page items are `PageSummary`
+objects; requesting `includeBody: true` from browse or revisions yields `Page`
+objects with their draft. The existing list, history, and published methods
+keep their full-content behavior for PHP callers.
+
+Agent authentication reads current credentials on every request. It writes the
+last-use timestamp at most once per minute per token, so repeated reads do not
+continually compete with content writes for SQLite's single writer.
+
 ## Alternatives
 
 A separate JavaScript application and API would duplicate state and deployment
