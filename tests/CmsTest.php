@@ -90,6 +90,8 @@ final class CmsTest extends TestCase
     {
         $root = $this->directory . '/consumer';
         mkdir($root);
+        mkdir($root . '/vendor');
+        file_put_contents($root . '/vendor/autoload.php', '<?php require ' . var_export(dirname(__DIR__) . '/vendor/autoload.php', true) . ';');
         $cms = new Cms(new Config($root, $this->directory . '/consumer-data'));
         $kernel = new Kernel($cms);
         foreach (['/assets/cms.css', '/assets/cms.js', '/assets/mark.svg', '/api/schema', '/llms.txt'] as $path) {
@@ -99,6 +101,19 @@ final class CmsTest extends TestCase
             self::assertSame(405, $kernel->handle(new Request('POST', $path))->status, $path);
         }
         self::assertNotSame(200, $kernel->handle(new Request('GET', '/assets/../composer.json'))->status);
+        $process = proc_open([PHP_BINARY, dirname(__DIR__) . '/bin/cms', 'doctor', '--json'],
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, $root,
+            ['CMS_ROOT' => $root, 'CMS_DATA_DIR' => $this->directory . '/cli-data', 'CMS_URL' => 'https://example.test']);
+        self::assertIsResource($process);
+        fclose($pipes[0]);
+        $output = stream_get_contents($pipes[1]);
+        $error = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        self::assertSame(0, proc_close($process), $error ?: 'CLI failed');
+        self::assertIsString($output);
+        self::assertStringContainsString('"status":"ok"', $output);
+        self::assertStringContainsString('https://example.test', $output);
     }
 
     public function testDraftPublicationAndSlugChangesAreIndependent(): void

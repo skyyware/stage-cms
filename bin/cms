@@ -9,7 +9,8 @@ use StageCms\Identity\Identity;
 use StageCms\Infrastructure\Archive;
 use StageCms\Infrastructure\Config;
 
-require dirname(__DIR__) . '/vendor/autoload.php';
+$root = getenv('CMS_ROOT') ?: dirname(__DIR__);
+require $root . '/vendor/autoload.php';
 
 umask(0077);
 $arguments = $argv ?? [];
@@ -75,7 +76,7 @@ TEXT;
         readfile(dirname(__DIR__) . '/docs/openapi.json');
         exit(0);
     }
-    $cms = new Cms(Config::environment(getenv('CMS_ROOT') ?: dirname(__DIR__)));
+    $cms = new Cms(Config::environment($root));
     $caller = new Caller('owner:cli', Identity::PERMISSIONS);
     $result = match ($command) {
         'setup' => (function () use ($cms, $options, $password): array {
