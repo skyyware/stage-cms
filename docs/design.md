@@ -34,7 +34,11 @@ remove focus visibility to simplify the appearance.
 Saving a draft preserves the current publication. Preview shows saved work;
 publish makes it public. History restores a prior revision as a new draft.
 Changing type keeps incompatible content visible until the editor moves or
-clears it. Save errors retain the submitted text and revision number.
+clears it. Save errors retain the submitted text and revision number. Required fields are
+marked as publication requirements; empty drafts remain saveable. Failed
+publication opens the affected field groups and associates messages with inputs.
+Named pages show their actual public address and assigned type. Translations
+link to separate editors; choosing another language never relabels existing text.
 
 Use direct labels and state what an action changes. Status needs text as well
 as color. Forms work without JavaScript; enhancements handle formatting,

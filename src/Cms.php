@@ -5,6 +5,7 @@ namespace StageCms;
 
 use StageCms\Content\Pages;
 use StageCms\Content\PageTypes;
+use StageCms\Content\PublicationRule;
 use StageCms\Identity\Identity;
 use StageCms\Infrastructure\Config;
 use StageCms\Infrastructure\Database;
@@ -20,12 +21,12 @@ final readonly class Cms
     public Settings $settings;
 
     /** @param array<string, string> $locales */
-    public function __construct(public Config $config, public PageTypes $types = new PageTypes(), public array $locales = [])
+    public function __construct(public Config $config, public PageTypes $types = new PageTypes(), public array $locales = [], ?PublicationRule $publicationRule = null)
     {
         $this->db = new Database($config->data . '/cms.sqlite');
         $this->db->migrate();
         $this->identity = new Identity($this->db);
-        $this->pages = new Pages($this->db, $types, $locales);
+        $this->pages = new Pages($this->db, $types, $locales, $publicationRule);
         $this->media = new Library($this->db, $config->data . '/media');
         $this->settings = new Settings($this->db);
     }

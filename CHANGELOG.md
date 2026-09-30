@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.5.0 — 2026-09-30
+
+Pages have stable identities, linked translations, and optional application-owned
+names and public paths. Renaming a published slug retains its old address as a
+redirect. Existing pages keep their language; a translation starts as a separate
+private draft with its own history. Named routes also retain their assigned type.
+
+Required fields and application publication rules validate the exact revision
+inside the publication transaction. Failed validation preserves both the draft
+and publication. The editor shows field errors and actual public paths. Agents
+can read a published snapshot by ID and create or list translations.
+
+Schema 3 and export format 3 include translation groups, bindings, and redirects.
+Schema and archive versions 1 and 2 remain readable. Back up before upgrading;
+rollback requires the previous code and its pre-upgrade database together.
+Repositories remain private, MIT licensed, with repository automation disabled.
+
 ## 0.4.1 — 2026-09-30
 
 Private SKYYWARE dependencies prefer authenticated Git source installs. This

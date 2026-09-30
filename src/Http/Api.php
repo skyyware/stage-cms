@@ -48,6 +48,22 @@ final readonly class Api
             'page' => $number, 'next_page' => $revisions->nextPage]);
     }
 
+    public function published(Request $request): Response
+    {
+        $this->caller->require('content:read');
+        return Response::json(self::pageData($this->cms->pages->publishedById($request->parameters['id'])));
+    }
+
+    public function translations(Request $request): Response
+    {
+        $id = $request->parameters['id'];
+        if ($request->method === 'POST') {
+            $input = $this->context->json(['locale', 'slug', 'expected_version']);
+            return Response::json(self::pageData($this->cms->pages->translate($this->caller, $id, Input::text($input, 'locale'), Input::text($input, 'slug'), Input::integer($input['expected_version'] ?? null))), 201);
+        }
+        return Response::json(['translations' => array_map(self::pageData(...), $this->cms->pages->translations($this->caller, $id))]);
+    }
+
     public function revision(Request $request): Response
     {
         return Response::json(self::pageData($this->cms->pages->revision($this->caller, $request->parameters['id'], Input::integer($request->parameters['version']))));

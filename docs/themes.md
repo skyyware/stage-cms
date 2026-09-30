@@ -16,7 +16,7 @@ Use an account with access; keep credentials outside the repository.
     {"type": "vcs", "url": "git@github.com:skyyware/stage-cms.git"},
     {"type": "vcs", "url": "git@github.com:skyyware/stage.git"}
   ],
-  "require": {"skyyware/stage-cms": "^0.4.0"}
+  "require": {"skyyware/stage-cms": "^0.5.0"}
 }
 ```
 
@@ -30,7 +30,7 @@ use StageCms\Content\PageTypes;
 use StageCms\Infrastructure\Config;
 
 $types = new PageTypes(new PageType('homepage', 'Homepage', [
-    new Field('hero.title', 'Headline', 'Hero', limit: 200),
+    new Field('hero.title', 'Headline', 'Hero', limit: 200, required: true),
     new Field('hero.copy', 'Introduction', 'Hero', multiline: true),
 ], markdown: false));
 $cms = new Cms(Config::environment($applicationRoot), $types, [
@@ -42,16 +42,18 @@ $cms = new Cms(Config::environment($applicationRoot), $types, [
 The default `page` type accepts Markdown. Additional types may use Markdown,
 named fields, or both. A field has a stable key, label, group, multiline flag,
 and character limit. Unknown types, unsupported locales, unknown fields, and
-oversized values fail before writing. Empty fields are allowed. Field values
+oversized values fail before writing. Empty fields are allowed in drafts. A field
+with `required: true` must contain nonblank text before publication. Field values
 are plain text; the theme escapes them in their output context.
 
 Leave the locale map empty to accept any valid language code. When a map is
-provided, both browser and API writes enforce its choices. Language is revision
-metadata; the application owns translation relationships and URL routing.
+provided, both browser and API writes enforce its choices. Choose a language
+when creating a page. Existing pages keep that language; use a linked translation
+to write another version. Each translation has a separate publication and history.
 
 In the editor choose **Page type**, then **Apply type**. This changes the form
 without saving. Incompatible text remains visible so it can be moved or cleared.
-Select **Language**, complete the fields, and save a draft. Type, locale, fields,
+For a new page, select **Language**, complete the fields, and save a draft. Type, locale, fields,
 Markdown, and cover participate in the same publication and history workflow.
 
 Types are trusted application definitions, never code supplied by content.
@@ -66,7 +68,9 @@ Implement `StageCms\Presentation\Theme`:
 - `page(Page $page, bool $preview = false): Response` renders the supplied revision.
 
 Read `$page->type`, `$page->locale`, and `$page->draft->fields`. Read published
-summaries with `Pages::publication()` and full pages with `publishedPage()`.
+summaries with `Pages::publication()` and full pages with `publishedById()`,
+`publishedBinding()`, or `publishedPage()`. `browse(status: 'published')` is an
+editorial list: it returns the latest draft of pages with a live revision.
 For a preview, render the supplied draft instead of re-reading its publication.
 Escape plain text; render Markdown through `Presentation\Markdown`.
 
@@ -97,9 +101,32 @@ resources to the kernel, including the bundled fonts. The kernel serves its
 agent guide at `/api/guide` and schema at `/api/schema`; the site can keep its
 own `/llms.txt`. Preserve response headers and omit bodies on HEAD responses.
 
-The default publication maps `slug` to `/{slug}`. An application can map fixed
-routes such as `/de` to a published content key such as `de-home`. Document
-those mappings for editors and agents. Moving a key does not create redirects.
+The default publication maps `slug` to `/{slug}`. For a fixed route, bind a page
+ID once from trusted application setup:
+
+```php
+$cms->pages->bind($owner, 'homepage', $englishPage->id, '/');
+$cms->pages->bind($owner, 'homepage', $germanPage->id, '/de');
+$page = $cms->pages->publishedBinding('homepage', 'de');
+```
+
+Binding requires `admin`. The same binding is safe to repeat; conflicting names,
+languages, paths, or page IDs fail. Translations with the same binding name join
+one group, with at most one page per language. A binding fixes the page type and
+language, and survives slug edits, unpublishing, archive, and recovery. It changes
+routing immediately; install bindings during application setup or migration.
+`bound($owner, $name, $locale)` also finds drafts and archived pages so an importer
+can preserve them. The content API cannot change bindings.
+
+`Page::path()` returns the bound path or `/{slug}`. Paths are `/` or lowercase
+segments separated by slashes, with digits and hyphens allowed. CMS endpoint
+prefixes are reserved. The default kernel resolves bound paths and redirects old
+slugs with HTTP 301. An application with its own routes can use `resolvePath()`
+and redirect when the returned page's `path()` differs from the requested path.
+Old public slugs stay reserved to their page; they resolve only while that page
+is published. `publishedPage($slug)` remains an exact-slug read.
+
+See [publication rules](publication.md) for application validation.
 
 Use a private persistent data directory outside public/ and release folders.
 Set `CMS_ROOT`, `CMS_DATA_DIR`, and `CMS_URL` consistently for HTTP and the CLI.

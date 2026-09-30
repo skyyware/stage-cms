@@ -24,7 +24,7 @@ MIT licensed; public package distribution will resume with a public release.
 Private SKYYWARE dependencies install through authenticated Git over SSH.
 
 ```sh
-git clone --branch v0.4.1 git@github.com:skyyware/stage-cms.git my-site
+git clone --branch v0.5.0 git@github.com:skyyware/stage-cms.git my-site
 cd my-site
 composer install
 php bin/cms setup --name="Your name" --email="you@example.com"
@@ -103,7 +103,8 @@ php bin/benchmark
 ```
 
 Checks validate package metadata, PHPStan at its strictest level, and behavior
-tests. CI runs on PHP 8.4 and 8.5. Browser verification should cover a complete
+tests. Repository automation is disabled; run these checks locally before delivery.
+Browser verification should cover a complete
 publishing workflow at desktop and mobile widths.
 
 The benchmark creates isolated fixtures for 100 pages, 50 revisions, and 10,000
@@ -122,7 +123,8 @@ One owner and one site; no team roles, comments, scheduled publication,
 a plugin marketplace, or real-time collaboration. Applications register their
 own page types and themes in code. Types provide text fields, not arbitrary
 executable templates or a visual layout builder. Pages have one
-lowercase URL segment. Markdown accepts no raw HTML. External images are
+lowercase content key; applications can bind pages to stable public paths.
+Markdown accepts no raw HTML. External images are
 blocked by the content security policy; upload them to the library.
 
 Pages, history, and images use 50-item pagination. Lists read summaries; complete

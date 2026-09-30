@@ -65,13 +65,15 @@ final readonly class Web
         $values = $page === null ? [] : array_merge($page->draft->data(), ['cover' => $page->draft->cover ?? '', 'expected_version' => (string) $page->version]);
         $error = '';
         $status = 200;
+        $errors = [];
+        $translations = $page === null ? [] : $this->cms->pages->translations($this->session->caller(), $id);
         if ($request->method === 'POST') {
             $values = $this->context->form();
             try {
                 $intent = Input::text($values, 'intent', 'save');
                 if ($intent === 'type') {
                     $this->cms->types->get(Input::text($values, 'type', 'page'));
-                    return $this->shell($page->title ?? 'New page', 'pages', $this->view->editor($page, $values, [], $this->session, true));
+                    return $this->shell($page->title ?? 'New page', 'pages', $this->view->editor($page, $values, [], $this->session, true, translations: $translations));
                 }
                 $definition = $this->cms->types->get(Input::text($values, 'type', 'page'));
                 $keys = array_fill_keys(array_map(fn ($field) => $field->key, $definition->fields), true);
@@ -84,6 +86,7 @@ final readonly class Web
             } catch (Failure $failure) {
                 $error = $failure->getMessage();
                 $status = $failure->status;
+                $errors = $failure->errors;
             }
         }
         $cover = Input::text($values, 'cover', '');
@@ -95,11 +98,18 @@ final readonly class Web
                 $values['cover'] = '';
             }
         }
-        $body = $this->view->editor($page, $values, $media, $this->session, $status !== 200);
+        $body = $this->view->editor($page, $values, $media, $this->session, $status !== 200, $errors, $translations);
         if ($status === 409 && $page !== null) {
             $body = '<p class="conflict-link"><a href="/admin/pages/' . $page->id . '" target="_blank" rel="noopener">Open the latest version in another tab ↗</a></p>' . $body;
         }
         return $this->shell($page?->draft->title ?? 'New page', 'pages', $body, $error, $status);
+    }
+
+    public function translate(Request $request): Response
+    {
+        $input = $this->context->form();
+        $page = $this->cms->pages->translate($this->session->caller(), $request->parameters['id'], Input::text($input, 'locale'), Input::text($input, 'slug'), Input::integer($input['expected_version'] ?? null));
+        return self::redirect('/admin/pages/' . $page->id . '?notice=translated');
     }
 
     public function change(Request $request): Response
@@ -254,6 +264,7 @@ final readonly class Web
         $notice = match (Input::text($this->context->query(), 'notice', '')) {
             'saved' => 'Draft saved.',
             'published' => 'Page published.',
+            'translated' => 'Copied as a draft. Translate the text before publishing.',
             'unpublish' => 'Page unpublished. It is now a private draft.',
             'archive' => 'Page archived. Recover it whenever you need it.',
             'recover', 'restore' => 'Restored as a draft.',

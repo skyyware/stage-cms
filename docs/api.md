@@ -103,7 +103,7 @@ current content or history.
 `locales` code-to-label object, and a `themes` ID-to-label object. An empty locale
 map means any syntactically valid language code is accepted. Each type lists
 its ID, label, Markdown support, and fields with key, label, group, multiline,
-and character limit.
+character limit, and `required` publication flag.
 
 Create or replace a typed draft using `type`, `locale`, and `fields` alongside
 title, slug, excerpt, body, and cover. For example, when a `homepage` type with
@@ -117,6 +117,37 @@ Only registered fields are writable. A type with `markdown: false` requires an
 empty body. Named fields are plain UTF-8 text, limited to 200,000 bytes of their
 JSON encoding in total and each definition's character limit. Themes and type
 definitions cannot be installed through the content API.
+
+## Identity, translations, and publication
+
+Responses include `translation_group`, nullable `binding`, and canonical `path`.
+Applications assign bindings; content tokens cannot change them. A bound page
+keeps its type and public route. Existing pages keep their language.
+
+`GET /api/pages/{id}/translations` requires read access and returns a
+`translations` array of current summaries, including archived versions.
+`POST /api/pages/{id}/translations` also requires write access and accepts:
+
+```json
+{"locale":"de","slug":"willkommen","expected_version":3}
+```
+
+It copies the source's current saved revision into a new private draft and returns
+201. Translate the text before publishing. The source stays unchanged. Existing
+languages, including archived translations, return `409 translation_exists`.
+A stale source version returns `409 stale_revision`. This operation has no
+idempotency key; inspect translations after a lost response before retrying.
+
+`GET /api/pages/{id}/published` requires read access and returns the exact live
+revision, or 404 when unpublished or archived. The usual `status=published` list
+returns latest editorial drafts of pages with a live revision; it is not a feed
+of live content. Read the current draft version before writing.
+
+Required fields and application publication rules are checked inside the write
+transaction. Failed publication creates no revision and changes no publication
+pointer. Validation errors can include `error.fields`, a map from field keys such
+as `fields.hero.title` to messages. Read the code and message too; application
+rules may reject publication for reasons beyond missing fields.
 
 ## Upgrade from 0.3
 

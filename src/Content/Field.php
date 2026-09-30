@@ -11,6 +11,7 @@ final readonly class Field
         public string $group = 'Content',
         public bool $multiline = false,
         public int $limit = 10000,
+        public bool $required = false,
     ) {
         if (!preg_match('/^[a-z][a-z0-9_.-]{0,119}$/D', $key) || trim($label) === '' || $limit < 1 || $limit > 200000) {
             throw new \InvalidArgumentException('Invalid content field definition.');

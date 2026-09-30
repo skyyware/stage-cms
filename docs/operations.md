@@ -28,7 +28,7 @@ network share or several servers writing separate copies.
 Install a reviewed release:
 
 ```sh
-git clone --branch v0.4.1 git@github.com:skyyware/stage-cms.git
+git clone --branch v0.5.0 git@github.com:skyyware/stage-cms.git
 cd stage-cms
 composer install --no-dev --no-interaction --no-plugins
 ```
@@ -119,17 +119,23 @@ Read the changelog, take and test a backup, install a tagged release, and run
 the checks in a development environment first. The application checks database
 schema version during startup and refuses an unknown newer schema.
 
-Version 0.4 migrates schema 1 to schema 2 on first startup. It retains existing
-pages and publication pointers, adds type `page`, locale `en`, and empty named
-fields to every revision, and leaves the default theme selected. Back up before
-that first request. Version 0.3 cannot open schema 2: rollback requires stopping
-writers and restoring the pre-upgrade data directory together with the old code.
+Version 0.5 migrates schemas 1 and 2 to schema 3 on first startup. Existing
+content, revision numbers, publication pointers, and settings are preserved.
+Each page starts in its own translation group; its latest revision defines its
+identity language. Install application bindings after migration. Do not infer
+translation relationships from similar text or silently replace edited pages.
 
-New exports use `stage-cms/2` and include types, locales, fields, and theme IDs.
-Version 0.4 accepts both format 1 and format 2 exports. Reinstall the application's
-page type and theme definitions before editing or rendering restored content;
-archives preserve data and do not contain executable themes. Downgrading a
-format 2 archive to an earlier release is unsupported.
+Back up before the first request. Version 0.4 cannot open schema 3: rollback
+requires stopping writers and restoring the pre-upgrade data directory together
+with the old code. Use a consistent SQLite backup, not a loose copy of an active
+database without its WAL. Test a restore before relying on a backup.
+
+New exports use `stage-cms/3` and include translation groups, bindings, redirects,
+types, locales, fields, and theme IDs. Restore also accepts formats 1 and 2.
+Reinstall matching page types, publication rules, and themes; archives preserve
+data, not application code. Restore does not revalidate historical publication
+against current rules. Review time-sensitive content before serving restored
+publications. Downgrading a format 3 archive is unsupported.
 
 Public source availability is separate from production deployment. No
 production domain or hosted CMS service is bundled with this repository.

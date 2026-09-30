@@ -32,7 +32,22 @@ final readonly class Database
     public function migrate(): void
     {
         $version = $this->schemaVersion();
+        if ($version === 3) {
+            return;
+        }
         if ($version === 2) {
+            $this->transaction(function (): void {
+                if ($this->schemaVersion() !== 2) {
+                    return;
+                }
+                $this->pdo->exec("ALTER TABLE pages ADD COLUMN translation_group TEXT NOT NULL DEFAULT '';
+                    ALTER TABLE pages ADD COLUMN locale TEXT NOT NULL DEFAULT 'en';
+                    UPDATE pages SET translation_group = id, locale = (SELECT locale FROM revisions WHERE page_id = pages.id AND version = pages.version);
+                    CREATE UNIQUE INDEX page_languages ON pages(translation_group, locale);
+                    CREATE TABLE page_bindings (name TEXT NOT NULL, locale TEXT NOT NULL, page_id TEXT NOT NULL UNIQUE REFERENCES pages(id), path TEXT NOT NULL UNIQUE, type TEXT NOT NULL, PRIMARY KEY(name, locale));
+                    CREATE TABLE page_redirects (slug TEXT PRIMARY KEY, page_id TEXT NOT NULL REFERENCES pages(id));
+                    PRAGMA user_version = 3;");
+            });
             return;
         }
         if ($version === 1) {
@@ -46,6 +61,7 @@ final readonly class Database
                     ALTER TABLE settings ADD COLUMN theme TEXT NOT NULL DEFAULT '';
                     PRAGMA user_version = 2;");
             });
+            $this->migrate();
             return;
         }
         if ($version !== 0) {

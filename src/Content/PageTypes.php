@@ -32,13 +32,13 @@ final readonly class PageTypes
         $this->get($draft->type)->validate($draft);
     }
 
-    /** @return list<array{id: string, label: string, markdown: bool, fields: list<array{key: string, label: string, group: string, multiline: bool, limit: int}>}> */
+    /** @return list<array{id: string, label: string, markdown: bool, fields: list<array{key: string, label: string, group: string, multiline: bool, limit: int, required: bool}>}> */
     public function data(): array
     {
         return array_values(array_map(fn (PageType $type): array => ['id' => $type->id, 'label' => $type->label,
             'markdown' => $type->markdown, 'fields' => array_map(fn (Field $field): array => [
                 'key' => $field->key, 'label' => $field->label, 'group' => $field->group,
-                'multiline' => $field->multiline, 'limit' => $field->limit,
+                'multiline' => $field->multiline, 'limit' => $field->limit, 'required' => $field->required,
             ], $type->fields)], $this->all));
     }
 }

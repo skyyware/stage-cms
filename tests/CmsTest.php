@@ -608,6 +608,8 @@ final class CmsTest extends TestCase
         $tables = Input::object($data['tables']);
         $rows = $this->cms->db->all('SELECT page_id, version, title, slug, excerpt, body, cover, action, actor, created_at FROM revisions');
         $tables['revisions'] = $rows;
+        $tables['pages'] = $this->cms->db->all('SELECT id, slug, version, published_version, published_slug, archived, created_at FROM pages');
+        unset($tables['page_bindings'], $tables['page_redirects']);
         $data['tables'] = $tables;
         $zip->addFromString('content.json', json_encode($data, JSON_THROW_ON_ERROR));
         $zip->close();
@@ -653,14 +655,185 @@ final class CmsTest extends TestCase
     public function testVersionOneDatabaseMigratesWithoutChangingPublishedContent(): void
     {
         $page = $this->cms->pages->create($this->owner, $this->draft(), true);
-        $this->cms->db->pdo->exec('ALTER TABLE revisions DROP COLUMN type; ALTER TABLE revisions DROP COLUMN locale; ALTER TABLE revisions DROP COLUMN fields; ALTER TABLE settings DROP COLUMN theme; PRAGMA user_version = 1;');
+        $this->cms->db->pdo->exec('DROP TABLE page_bindings; DROP TABLE page_redirects; DROP INDEX page_languages; ALTER TABLE pages DROP COLUMN translation_group; ALTER TABLE pages DROP COLUMN locale; ALTER TABLE revisions DROP COLUMN type; ALTER TABLE revisions DROP COLUMN locale; ALTER TABLE revisions DROP COLUMN fields; ALTER TABLE settings DROP COLUMN theme; PRAGMA user_version = 1;');
         $upgraded = new Cms($this->cms->config);
         $restored = $upgraded->pages->publishedPage($page->slug);
         self::assertSame($page->draft->data(), $restored->draft->data());
         $version = $upgraded->db->pdo->query('PRAGMA user_version');
         self::assertNotFalse($version);
-        self::assertSame(2, $version->fetchColumn());
+        self::assertSame(3, $version->fetchColumn());
         $upgraded->db->migrate();
         self::assertSame($page->version, $upgraded->pages->get($this->owner, $page->id)->version);
+    }
+    public function testNamedPagesKeepTheirRoutesAndTranslationIdentity(): void
+    {
+        $page = $this->cms->pages->create($this->owner, $this->draft(), true);
+        $page = $this->cms->pages->bind($this->owner, 'homepage', $page->id, '/');
+        self::assertSame('/', $this->cms->pages->bind($this->owner, 'homepage', $page->id, '/')->path());
+        $german = $this->cms->pages->translate($this->owner, $page->id, 'de', 'anfang', $page->version);
+        self::assertSame('draft', $german->status());
+        self::assertSame($page->translationGroup, $german->translationGroup);
+        self::assertCount(2, $this->cms->pages->translations($this->owner, $page->id));
+        $this->fails('translation_exists', fn () => $this->cms->pages->translate($this->owner, $page->id, 'de', 'zweiter-anfang', 1));
+        $this->fails('stale_revision', fn () => $this->cms->pages->translate($this->owner, $page->id, 'fr', 'bonjour', 99));
+        $this->fails('binding_taken', fn () => $this->cms->pages->bind($this->owner, 'unrelated', $german->id, '/de'));
+        $german = $this->cms->pages->bind($this->owner, 'homepage', $german->id, '/de');
+        $this->fails('not_found', fn () => $this->cms->pages->publishedBinding('homepage', 'de'));
+        $this->cms->pages->publish($this->owner, $german->id, $german->version);
+        self::assertSame('/de', $this->cms->pages->publishedBinding('homepage', 'de')->path());
+        $renamed = $this->cms->pages->save($this->owner, $page->id, $this->draft(slug: 'renamed'), $page->version, true);
+        self::assertSame($page->id, $this->cms->pages->publishedBinding('homepage', 'en')->id);
+        self::assertSame('/', $this->cms->pages->resolvePath('/a-beginning')->path());
+        self::assertSame($page->id, $this->cms->pages->resolvePath('/renamed')->id);
+        $this->fails('slug_taken', fn () => $this->cms->pages->create($this->owner, $this->draft()));
+        $kernel = new Kernel($this->cms);
+        self::assertSame(200, $kernel->handle(new Request('GET', '/'))->status);
+        self::assertSame('/', $kernel->handle(new Request('GET', '/a-beginning'))->headers['location']);
+        self::assertSame('/de', $kernel->handle(new Request('GET', '/anfang'))->headers['location']);
+        $this->fails('fixed_language', fn () => $this->cms->pages->save($this->owner, $page->id, new Draft('Changed', 'renamed', '', '', locale: 'de'), $renamed->version));
+        $path = $this->directory . '/identity.zip';
+        file_put_contents($path, (new Archive($this->cms))->export($this->owner));
+        $copy = new Cms(new Config(dirname(__DIR__), $this->directory . '/identity-copy'));
+        (new Archive($copy))->restore($this->owner, $path);
+        self::assertSame($renamed->data(), $copy->pages->publishedById($page->id)->data());
+        self::assertCount(2, $copy->pages->translations($this->owner, $page->id));
+        self::assertSame('/', $copy->pages->resolvePath('/a-beginning')->path());
+        $archived = $copy->pages->archive($this->owner, $page->id, $renamed->version);
+        $this->fails('not_found', fn () => $copy->pages->resolvePath('/a-beginning'));
+        $recovered = $copy->pages->recover($this->owner, $page->id, $archived->version);
+        $this->fails('not_found', fn () => $copy->pages->publishedById($page->id));
+        self::assertSame('/', $recovered->path());
+    }
+
+    public function testPublicationValidatesTheExactCandidateAcrossAllWritePaths(): void
+    {
+        $rule = new class implements \StageCms\Content\PublicationRule {
+            /** @var list<\StageCms\Content\PublicationCandidate> */
+            public array $seen = [];
+            public function validate(\StageCms\Content\PublicationCandidate $candidate): void
+            {
+                $this->seen[] = $candidate;
+                if ($candidate->draft->fields['headline'] === 'Refuse') {
+                    throw new Failure(422, 'review_required', 'Review this headline.', ['fields.headline' => 'Use verified text.']);
+                }
+            }
+        };
+        $types = new \StageCms\Content\PageTypes(new \StageCms\Content\PageType('article', 'Article', [new \StageCms\Content\Field('headline', 'Headline', required: true)], false));
+        $cms = new Cms($this->cms->config, $types, ['en' => 'English', 'de' => 'Deutsch'], $rule);
+        $draft = fn (string $headline): Draft => new Draft('Article', 'article', '', '', type: 'article', fields: ['headline' => $headline]);
+        $this->fails('incomplete_publication', fn () => $cms->pages->create($this->owner, $draft(''), true));
+        $this->fails('review_required', fn () => $cms->pages->create($this->owner, $draft('Refuse'), true));
+        self::assertCount(0, $cms->pages->list($this->owner));
+        $page = $cms->pages->create($this->owner, $draft('Original'), true);
+        self::assertSame($page->id, $rule->seen[1]->pageId);
+        self::assertSame(1, $rule->seen[1]->version);
+        $this->fails('review_required', fn () => $cms->pages->save($this->owner, $page->id, $draft('Refuse'), 1, true));
+        self::assertSame(1, $cms->pages->get($this->owner, $page->id)->version);
+        $page = $cms->pages->save($this->owner, $page->id, $draft('Refuse'), 1);
+        $this->fails('review_required', fn () => $cms->pages->publish($this->owner, $page->id, $page->version));
+        self::assertSame(3, $rule->seen[3]->version);
+        self::assertSame('Original', $cms->pages->publishedById($page->id)->draft->fields['headline']);
+        self::assertCount(2, $cms->pages->history($this->owner, $page->id));
+        $this->fails('stale_revision', fn () => $cms->pages->publish($this->owner, $page->id, 1));
+        self::assertCount(4, $rule->seen);
+        $token = $cms->identity->createToken($this->owner, 'Publisher', ['content:read', 'content:write', 'content:publish']);
+        $headers = ['authorization' => 'Bearer ' . $token, 'content-type' => 'application/json'];
+        $kernel = new Kernel($cms);
+        $response = $kernel->handle(new Request('POST', '/api/pages/' . $page->id . '/publish', '{"expected_version":2}', $headers));
+        self::assertSame(422, $response->status);
+        self::assertStringContainsString('"fields.headline":"Use verified text."', $response->body);
+        self::assertStringContainsString('Original', $kernel->handle(new Request('GET', '/api/pages/' . $page->id . '/published', headers: $headers))->body);
+        $session = $cms->identity->login($cms->identity->newSession(), 'editor@example.test', 'a long test-only password', 'local');
+        $form = $draft('')->data() + ['expected_version' => 2, 'csrf' => $session->csrf, 'intent' => 'publish'];
+        $response = $kernel->handle(new Request('POST', '/admin/pages/' . $page->id, http_build_query($form), ['cookie' => 'stage_cms=' . $session->secret, 'content-type' => 'application/x-www-form-urlencoded']));
+        self::assertSame(422, $response->status);
+        self::assertStringContainsString('aria-invalid="true" aria-describedby="field-headline-error"', $response->body);
+        self::assertStringContainsString('Required to publish', $response->body);
+        self::assertSame(2, $cms->pages->get($this->owner, $page->id)->version);
+        $form['intent'] = 'save';
+        self::assertSame(303, $kernel->handle(new Request('POST', '/admin/pages/' . $page->id, http_build_query($form), ['cookie' => 'stage_cms=' . $session->secret, 'content-type' => 'application/x-www-form-urlencoded']))->status);
+        $bound = $cms->pages->bind($this->owner, 'article', $page->id, '/news/article');
+        $this->fails('fixed_page_type', fn () => $cms->pages->save($this->owner, $page->id, new Draft('Other', 'article', '', ''), $bound->version));
+        self::assertSame(200, $kernel->handle(new Request('GET', '/news/article'))->status);
+    }
+
+    public function testTranslationsApiHonorsScopesVersionsAndSeparateDrafts(): void
+    {
+        $page = $this->cms->pages->create($this->owner, $this->draft(), true);
+        $kernel = new Kernel($this->cms);
+        $reader = $this->cms->identity->createToken($this->owner, 'Reader', ['content:read']);
+        $writer = $this->cms->identity->createToken($this->owner, 'Writer', ['content:read', 'content:write']);
+        $path = '/api/pages/' . $page->id . '/translations';
+        $body = '{"locale":"de","slug":"anfang","expected_version":1}';
+        self::assertSame(403, $kernel->handle(new Request('POST', $path, $body, ['authorization' => 'Bearer ' . $reader, 'content-type' => 'application/json']))->status);
+        $headers = ['authorization' => 'Bearer ' . $writer, 'content-type' => 'application/json'];
+        self::assertSame(201, $kernel->handle(new Request('POST', $path, $body, $headers))->status);
+        self::assertSame(409, $kernel->handle(new Request('POST', $path, $body, $headers))->status);
+        self::assertStringContainsString('"locale":"de"', $kernel->handle(new Request('GET', $path, headers: $headers))->body);
+        self::assertCount(1, $this->cms->pages->published());
+        self::assertSame(1, $this->cms->pages->get($this->owner, $page->id)->version);
+        $this->fails('invalid_binding', fn () => $this->cms->pages->bind($this->owner, 'home', $page->id, '/admin'));
+    }
+    public function testUnpublishedAddressesStayReservedUntilPublicationReturns(): void
+    {
+        $page = $this->cms->pages->create($this->owner, $this->draft(), true);
+        $page = $this->cms->pages->unpublish($this->owner, $page->id, $page->version);
+        $this->fails('not_found', fn () => $this->cms->pages->resolvePath('/a-beginning'));
+        $page = $this->cms->pages->save($this->owner, $page->id, $this->draft(slug: 'new-address'), $page->version);
+        $this->fails('slug_taken', fn () => $this->cms->pages->create($this->owner, $this->draft()));
+        $this->cms->pages->publish($this->owner, $page->id, $page->version);
+        self::assertSame('/new-address', $this->cms->pages->resolvePath('/a-beginning')->path());
+    }
+
+    public function testVersionTwoMigrationAndArchiveKeepNonEnglishPublishedRevisions(): void
+    {
+        $page = $this->cms->pages->create($this->owner, new Draft('Bonjour', 'bonjour', '', 'Texte', locale: 'fr'), true);
+        $path = $this->directory . '/version-two.zip';
+        file_put_contents($path, (new Archive($this->cms))->export($this->owner));
+        $zip = new ZipArchive();
+        self::assertTrue($zip->open($path) === true);
+        $json = $zip->getFromName('content.json');
+        self::assertIsString($json);
+        $data = Input::object(json_decode($json, true, flags: JSON_THROW_ON_ERROR));
+        $data['format'] = 'stage-cms/2';
+        $tables = Input::object($data['tables']);
+        $tables['pages'] = $this->cms->db->all('SELECT id, slug, version, published_version, published_slug, archived, created_at FROM pages');
+        unset($tables['page_bindings'], $tables['page_redirects']);
+        $data['tables'] = $tables;
+        $zip->addFromString('content.json', json_encode($data, JSON_THROW_ON_ERROR));
+        $zip->close();
+        $copy = new Cms(new Config(dirname(__DIR__), $this->directory . '/version-two-copy'));
+        (new Archive($copy))->restore($this->owner, $path);
+        self::assertSame($page->data(), $copy->pages->publishedById($page->id)->data());
+        $this->cms->db->pdo->exec('DROP TABLE page_bindings; DROP TABLE page_redirects; DROP INDEX page_languages; ALTER TABLE pages DROP COLUMN translation_group; ALTER TABLE pages DROP COLUMN locale; PRAGMA user_version = 2;');
+        $upgraded = new Cms($this->cms->config);
+        self::assertSame($page->data(), $upgraded->pages->publishedById($page->id)->data());
+        $row = $upgraded->db->one('SELECT locale FROM pages WHERE id = :id', ['id' => $page->id]);
+        self::assertNotNull($row);
+        self::assertSame('fr', Input::text($row, 'locale'));
+        $upgraded->db->migrate();
+        self::assertCount(1, $upgraded->pages->history($this->owner, $page->id));
+    }
+    public function testRestoreRejectsInconsistentBindingsWithoutPartialContent(): void
+    {
+        $page = $this->cms->pages->create($this->owner, $this->draft(), true);
+        $this->cms->pages->bind($this->owner, 'homepage', $page->id, '/');
+        $path = $this->directory . '/conflicting-binding.zip';
+        file_put_contents($path, (new Archive($this->cms))->export($this->owner));
+        $zip = new ZipArchive();
+        self::assertTrue($zip->open($path) === true);
+        $json = $zip->getFromName('content.json');
+        self::assertIsString($json);
+        $data = Input::object(json_decode($json, true, flags: JSON_THROW_ON_ERROR));
+        $tables = Input::object($data['tables']);
+        $tables['page_bindings'] = [['name' => 'homepage', 'locale' => 'de', 'page_id' => $page->id, 'path' => '/', 'type' => 'page']];
+        $data['tables'] = $tables;
+        $zip->addFromString('content.json', json_encode($data, JSON_THROW_ON_ERROR));
+        $zip->close();
+        $copy = new Cms(new Config(dirname(__DIR__), $this->directory . '/invalid-copy'));
+        $this->fails('invalid_archive', fn () => (new Archive($copy))->restore($this->owner, $path));
+        self::assertCount(0, $copy->pages->list($this->owner));
+        self::assertSame([], $copy->db->all('SELECT * FROM page_bindings'));
+        self::assertSame([], $copy->db->all('SELECT * FROM revisions'));
     }
 }

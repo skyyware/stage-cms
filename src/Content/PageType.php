@@ -34,4 +34,17 @@ final readonly class PageType
             throw new Failure(422, 'invalid_body', 'This page type uses named fields instead of Markdown.');
         }
     }
+
+    public function validatePublication(Draft $draft): void
+    {
+        $errors = [];
+        foreach ($this->fields as $field) {
+            if ($field->required && trim($draft->fields[$field->key] ?? '') === '') {
+                $errors['fields.' . $field->key] = $field->label . ' is required before publishing.';
+            }
+        }
+        if ($errors !== []) {
+            throw new Failure(422, 'incomplete_publication', 'Complete the required fields before publishing.', $errors);
+        }
+    }
 }

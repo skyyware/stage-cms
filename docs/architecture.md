@@ -52,10 +52,23 @@ continually compete with content writes for SQLite's single writer.
 
 ## Content and presentation
 
-Schema 2 stores `type`, `locale`, and JSON `fields` with every revision, and a
+Schema 3 retains schema 2 content: it stores `type`, `locale`, and JSON `fields` with every revision, and a
 selected theme ID in settings. Existing schema 1 revisions migrate to the
 Markdown `page` type, language `en`, and empty fields. Migration rechecks the
 version under the write lock. Already-current reads need no migration lock.
+
+Schema 3 adds one translation group and identity language per page, unique
+within a group. Existing pages start in their own groups. Applications can bind
+a name and language to one page ID, type, and public path. A separate alias table
+reserves previous public slugs. These identity records are current metadata,
+not historical revision snapshots.
+
+Publication checks required fields and the optional application rule after
+permission and revision checks, before recording the exact candidate and moving
+the publication pointer. All checks share one write transaction. Rules must use
+bounded local evidence; network calls would hold SQLite's writer lock. Published
+reads never run the rule again. Time-sensitive applications must also filter
+expired published evidence when serving it.
 
 Page type definitions validate writes in the content operation, so browser,
 API, and PHP callers use the same rules. Installed theme definitions belong to

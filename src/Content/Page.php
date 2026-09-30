@@ -16,9 +16,12 @@ final readonly class Page extends PageSummary
         string $updatedAt,
         string $actor,
         string $action,
+        string $translationGroup = '',
+        ?string $binding = null,
+        ?string $publicPath = null,
     ) {
         parent::__construct($id, $draft->title, $draft->slug, $draft->excerpt, $draft->cover,
-            $version, $publishedVersion, $archived, $updatedAt, $actor, $action, $draft->type, $draft->locale);
+            $version, $publishedVersion, $archived, $updatedAt, $actor, $action, $draft->type, $draft->locale, $translationGroup, $binding, $publicPath);
     }
 
     /** @param array<string, mixed> $row */
@@ -26,7 +29,8 @@ final readonly class Page extends PageSummary
     {
         return new self(Input::text($row, 'id'), Draft::fromRow($row), Input::integer($row['version']),
             $row['published_version'] === null ? null : Input::integer($row['published_version']),
-            $row['archived'] === 1, Input::text($row, 'created_at'), Input::text($row, 'actor'), Input::text($row, 'action'));
+            $row['archived'] === 1, Input::text($row, 'created_at'), Input::text($row, 'actor'), Input::text($row, 'action'),
+            Input::text($row, 'translation_group', Input::text($row, 'id')), Input::optional($row, 'binding'), Input::optional($row, 'public_path'));
     }
 
     /** @return array<string, mixed> */

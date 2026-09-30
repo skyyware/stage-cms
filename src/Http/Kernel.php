@@ -35,7 +35,7 @@ final readonly class Kernel
         try {
             $response = $this->dispatch(new Context($request, $uploads, $address), $view);
         } catch (Failure $error) {
-            $response = $api ? Response::json(['error' => ['code' => $error->kind, 'message' => $error->getMessage()]], $error->status)
+            $response = $api ? Response::json(['error' => ['code' => $error->kind, 'message' => $error->getMessage(), 'fields' => (object) $error->errors]], $error->status)
                 : Response::html($view->problem($error->getMessage(), $error->status), $error->status);
         } catch (Forbidden) {
             $response = $api ? Response::json(['error' => ['code' => 'forbidden', 'message' => 'This token does not have the required permission.']], 403)
@@ -106,6 +106,9 @@ final readonly class Kernel
                 new Route('PUT', '/api/pages/{id}', $api->page(...)),
                 new Route('GET', '/api/pages/{id}/history', $api->history(...)),
                 new Route('GET', '/api/pages/{id}/history/{version}', $api->revision(...)),
+                new Route('GET', '/api/pages/{id}/published', $api->published(...)),
+                new Route('GET', '/api/pages/{id}/translations', $api->translations(...)),
+                new Route('POST', '/api/pages/{id}/translations', $api->translations(...)),
                 new Route('POST', '/api/pages/{id}/{action}', $api->change(...)),
                 new Route('GET', '/api/media', $api->media(...)),
                 new Route('POST', '/api/media', $api->media(...)),
@@ -143,6 +146,7 @@ final readonly class Kernel
                 new Route('GET', '/admin/pages/{id}/cover', $web->cover(...)),
                 new Route('POST', '/admin/pages/{id}/cover', $web->cover(...)),
                 new Route('GET', '/admin/pages/{id}/preview', $web->preview(...)),
+                new Route('POST', '/admin/pages/{id}/translations', $web->translate(...)),
                 new Route('POST', '/admin/pages/{id}/{action}', $web->change(...)),
                 new Route('GET', '/admin/media', $web->media(...)),
                 new Route('POST', '/admin/media', $web->media(...)),
@@ -156,6 +160,17 @@ final readonly class Kernel
                 new Route('POST', '/admin/export', $web->export(...)),
                 new Route('GET', '/admin/help', $web->help(...)),
             ))->handle($request);
+        }
+        if (in_array($request->method, ['GET', 'HEAD'], true)) {
+            try {
+                $page = $this->cms->pages->resolvePath($request->path);
+                return $page->path() === $request->path ? $this->theme->page($page)
+                    : new Response('', 301, ['location' => $page->path() . ($request->query === '' ? '' : '?' . $request->query)]);
+            } catch (Failure $error) {
+                if ($error->status !== 404) {
+                    throw $error;
+                }
+            }
         }
         return (new Application(
             new Route('GET', '/', function () use ($context): Response {

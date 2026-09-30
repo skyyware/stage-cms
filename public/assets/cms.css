@@ -1861,6 +1861,18 @@ input[type=checkbox]:focus-visible{box-shadow:0 0 0 3px var(--soft);border:2px s
 .content-field textarea{min-height:100px}
 .revision-fields section{padding:21px 0;border-top:1px solid var(--line)}
 .revision-fields h2{font-size:1rem}
+.fixed-detail{margin:6px 0 16px;overflow-wrap:anywhere}
+.field-requirement{display:block;margin-top:4px;font-size:.75rem;font-weight:400;color:var(--muted)}
+.field-error{margin:6px 0 0;color:#9b2424;font-size:.85rem}
+[aria-invalid=true]{border-color:#9b2424}
+.translations{padding:28px 0;border-top:1px solid var(--line)}
+.translations h2{font-size:1.1rem}
+.translations nav{display:flex;gap:16px;flex-wrap:wrap;margin:16px 0}
+.translations [aria-current]{font-weight:700;text-decoration:underline;text-underline-offset:5px}
+.translations summary{cursor:pointer}
+.translations form{display:flex;gap:16px;align-items:end;flex-wrap:wrap;margin:16px 0}
+.translations form>div{flex:1;min-width:180px}
+.translations form label{display:block;margin-bottom:8px}
 .login-page{background:#edf1f5}
 .login .brand{color:#010711}
 .button.primary{background:#0c4f91}

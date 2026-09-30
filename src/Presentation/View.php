@@ -52,7 +52,7 @@ final readonly class View
             <nav aria-label="Workspace">{$nav}</nav>
             <div class="sidebar-bottom"><a href="/" target="_blank" rel="noopener">View site <span aria-hidden="true">↗</span></a>
             <a href="/admin/settings">Settings</a><form method="post" action="/admin/logout">{$csrf}<button class="link" type="submit">Sign out</button></form>
-            <span class="version">STAGE CMS / 0.4</span></div></aside>
+            <span class="version">STAGE CMS / 0.5</span></div></aside>
             <main id="main" class="main"><div class="topline"><span>WORKSPACE <span class="slash">/</span> {$site}</span><a href="/admin/help">Help <span aria-hidden="true">↗</span></a></div>
             {$alerts}{$body}<footer class="app-footer"><span>Stage CMS</span><span>by SKYYWARE</span></footer></main></div>
             HTML);
@@ -85,7 +85,7 @@ final readonly class View
         $body .= '<div class="page-table"><div class="table-labels"><span>PAGE</span><span>STATUS</span><span>LAST EDITED</span><span></span></div>';
         foreach ($pages as $page) {
             $body .= '<a class="page-row" href="/admin/pages/' . $page->id . '"><div class="page-title"><span class="page-symbol" aria-hidden="true">▤</span><span><strong>'
-                . self::e($page->title) . '</strong><small>' . self::e(($this->types->all[$page->type]->label ?? $page->type) . ' · ' . strtoupper($page->locale)) . ' · /' . self::e($page->slug) . '</small></span></div>'
+                . self::e($page->title) . '</strong><small>' . self::e(($this->types->all[$page->type]->label ?? $page->type) . ' · ' . strtoupper($page->locale)) . ' · ' . self::e($page->path()) . '</small></span></div>'
                 . self::badge($page) . '<time datetime="' . self::e($page->updatedAt) . '">' . self::date($page->updatedAt)
                 . '</time><span class="row-arrow" aria-hidden="true">↗</span></a>';
         }
@@ -101,8 +101,10 @@ final readonly class View
     /**
      * @param array<string, mixed> $values
      * @param list<Asset> $media
+     * @param array<string, string> $errors
+     * @param list<PageSummary> $translations
      */
-    public function editor(?Page $page, array $values, array $media, Session $session, bool $unsaved = false): string
+    public function editor(?Page $page, array $values, array $media, Session $session, bool $unsaved = false, array $errors = [], array $translations = []): string
     {
         $id = $page->id ?? 'new';
         $action = '/admin/pages/' . $id;
@@ -149,9 +151,23 @@ final readonly class View
         }
         $typeControl = '<label for="page-type">Page type</label><div class="type-control"><select id="page-type" name="type">' . $typeOptions
             . '</select><button class="button" name="intent" value="type" formnovalidate>Apply type</button></div>'
-            . '<p class="field-hint">Choose the fields and layout, then apply.</p><label for="locale">Language</label>'
-            . $languageControl;
-        $namedFields = $this->fields($type, Input::object($values['fields'] ?? []));
+            . '<p class="field-hint">Choose the fields and layout, then apply.</p>';
+        if ($page?->binding !== null) {
+            $typeControl = '<span class="field-label">Page type</span><p class="fixed-detail">' . self::e($this->types->all[$page->type]->label ?? $page->type)
+                . '</p><input type="hidden" name="type" value="' . self::e($page->type) . '"><p class="field-hint">Assigned by this website.</p>';
+        }
+        if ($page !== null) {
+            $languageControl = '<p class="fixed-detail">' . self::e($this->locales[$page->locale] ?? $page->locale) . '</p><input type="hidden" name="locale" value="' . self::e($page->locale) . '">';
+        }
+        $typeControl .= ($page === null ? '<label for="locale">Language</label>' : '<span class="field-label">Language</span>') . $languageControl;
+        $addressLabel = 'Address';
+        $addressHint = 'Lowercase letters, numbers, and hyphens.';
+        if ($page?->publicPath !== null) {
+            $typeControl .= '<span class="field-label">Public address</span><p class="fixed-detail">' . self::e($page->publicPath) . '</p>';
+            $addressLabel = 'Page key';
+            $addressHint = 'Used to identify content. The public address stays the same.';
+        }
+        $namedFields = $this->fields($type, Input::object($values['fields'] ?? []), $errors);
         $markdownVisibility = $definition !== null && !$definition->markdown && $content === '' ? ' hidden' : '';
         $conversion = $definition !== null && !$definition->markdown && $content !== ''
             ? '<p class="notice">This type uses named fields. Move your previous page content into those fields, then clear the Markdown text before saving.</p>' : '';
@@ -164,7 +180,7 @@ final readonly class View
             {$namedFields}{$conversion}<div class="markdown-editor"{$markdownVisibility}><div class="format-bar"><span>MARKDOWN</span><div><button type="button" data-format="bold" aria-label="Bold text"><b>B</b></button><button type="button" data-format="italic" aria-label="Italic text"><i>I</i></button><button type="button" data-format="heading" aria-label="Add heading">H₂</button><button type="button" data-format="link" aria-label="Add link">↗</button><button type="button" data-format="list" aria-label="Add list">☷</button></div><a href="/admin/help#writing" target="_blank" rel="noopener" aria-label="Writing guide">?</a></div>
             <label class="sr-only" for="body">Page content</label><textarea class="body-input" id="body" name="body" placeholder="Write your page content." maxlength="200000" data-body>{$content}</textarea></div>
             <div class="writing-bottom"><span data-word-count>Page content</span><span data-save-state>No unsaved changes</span></div></section>
-            <aside class="page-details"><h2>Page details</h2>{$typeControl}<label for="slug">Address</label><div class="slug-input"><span>/</span><input id="slug" name="slug" value="{$slug}" pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="120" placeholder="your-page" required data-slug></div><p class="field-hint">Lowercase letters, numbers, and hyphens.</p>
+            <aside class="page-details"><h2>Page details</h2>{$typeControl}<label for="slug">{$addressLabel}</label><div class="slug-input"><span>/</span><input id="slug" name="slug" value="{$slug}" pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="120" placeholder="your-page" required data-slug></div><p class="field-hint">{$addressHint}</p>
             <label for="excerpt">Summary <span>optional</span></label><textarea id="excerpt" name="excerpt" rows="4" maxlength="500" placeholder="Description for previews and search results.">{$excerpt}</textarea>
             <div class="field-label">Cover image <span>optional</span></div>{$coverControl}<button class="button cover-choose" name="intent" value="cover">Save &amp; choose image</button><p class="field-hint">Your draft is saved before the image library opens.</p>
             <div class="detail-note"><span class="note-dot"></span><p>Save a private draft. Publish to update the live page.</p></div>
@@ -177,22 +193,34 @@ final readonly class View
             }
             $body .= '<form method="post" action="' . $action . '/archive">' . $csrf . '<input type="hidden" name="expected_version" value="' . $page->version
                 . '"><button class="link">Move to archive</button></form></div></div>';
+            $body .= $this->translations($page, $translations, $session);
         }
         return $body;
     }
 
-    /** @param array<string, mixed> $values */
-    private function fields(string $type, array $values): string
+    /**
+     * @param array<string, mixed> $values
+     * @param array<string, string> $errors
+     */
+    private function fields(string $type, array $values, array $errors): string
     {
         $groups = [];
         $keys = [];
+        $invalidGroups = [];
         foreach ($this->types->all[$type]->fields ?? [] as $field) {
             $keys[$field->key] = true;
             $id = 'field-' . $field->key;
             $value = self::e(Input::text($values, $field->key, ''));
             $attributes = ' id="' . $id . '" name="fields[' . $field->key . ']" maxlength="' . $field->limit . '"';
-            $groups[$field->group][] = '<div class="content-field"><label for="' . $id . '">' . self::e($field->label) . '</label>'
-                . ($field->multiline ? '<textarea' . $attributes . ' rows="3">' . $value . '</textarea>' : '<input' . $attributes . ' value="' . $value . '">') . '</div>';
+            $message = '';
+            if (isset($errors['fields.' . $field->key])) {
+                $attributes .= ' aria-invalid="true" aria-describedby="' . $id . '-error"';
+                $message = '<p class="field-error" id="' . $id . '-error">' . self::e($errors['fields.' . $field->key]) . '</p>';
+                $invalidGroups[$field->group] = true;
+            }
+            $groups[$field->group][] = '<div class="content-field"><label for="' . $id . '">' . self::e($field->label)
+                . ($field->required ? ' <span class="field-requirement">Required to publish</span>' : '') . '</label>'
+                . ($field->multiline ? '<textarea' . $attributes . ' rows="3">' . $value . '</textarea>' : '<input' . $attributes . ' value="' . $value . '">') . $message . '</div>';
         }
         $previous = '';
         foreach ($values as $key => $value) {
@@ -204,9 +232,38 @@ final readonly class View
         }
         $html = '';
         foreach ($groups as $group => $fields) {
-            $html .= '<details class="field-group"' . ($html === '' ? ' open' : '') . '><summary>' . self::e($group) . '</summary><div>' . implode('', $fields) . '</div></details>';
+            $html .= '<details class="field-group"' . ($html === '' || isset($invalidGroups[$group]) ? ' open' : '') . '><summary>' . self::e($group) . '</summary><div>' . implode('', $fields) . '</div></details>';
         }
         return $html . ($previous === '' ? '' : '<details class="field-group" open><summary>Previous fields</summary><div><p>These fields are not used by this type. Move any text you need into the new fields, then clear them before saving.</p>' . $previous . '</div></details>');
+    }
+
+    /** @param list<PageSummary> $translations */
+    private function translations(Page $page, array $translations, Session $session): string
+    {
+        $html = '<section class="translations"><h2>Translations</h2><nav aria-label="Page translations">';
+        $existing = [];
+        foreach ($translations as $translation) {
+            $existing[$translation->locale] = true;
+            $html .= '<a href="/admin/pages/' . $translation->id . '"' . ($translation->id === $page->id ? ' aria-current="page"' : '') . '>'
+                . self::e($this->locales[$translation->locale] ?? $translation->locale) . '</a>';
+        }
+        $html .= '</nav>';
+        $available = array_diff_key($this->locales, $existing);
+        if ($available !== [] || $this->locales === []) {
+            $language = '<input id="translation-locale" name="locale" pattern="[a-z]{2,3}(-[A-Z]{2})?" maxlength="6" required>';
+            if ($available !== []) {
+                $language = '<select id="translation-locale" name="locale">';
+                foreach ($available as $locale => $label) {
+                    $language .= '<option value="' . self::e($locale) . '">' . self::e($label) . '</option>';
+                }
+                $language .= '</select>';
+            }
+            $html .= '<details><summary>New translation</summary><p>Copy the saved revision into a separate draft, then translate its text. Each language has its own history.</p>'
+                . '<form method="post" action="/admin/pages/' . $page->id . '/translations">' . self::csrf($session)
+                . '<input type="hidden" name="expected_version" value="' . $page->version . '"><div><label for="translation-locale">Language</label>' . $language
+                . '</div><div><label for="translation-slug">Address</label><input id="translation-slug" name="slug" pattern="[a-z0-9]+(-[a-z0-9]+)*" maxlength="120" required></div><button class="button">Create translation draft</button></form></details>';
+        }
+        return $html . '</section>';
     }
 
     /** @param list<PageSummary> $revisions */
@@ -391,7 +448,7 @@ final readonly class View
             $body .= '<p class="muted">No published pages yet.</p>';
         }
         foreach ($pages as $page) {
-            $body .= '<article><a href="/' . self::e($page->slug) . '">'
+            $body .= '<article><a href="' . self::e($page->path()) . '">'
                 . ($page->cover !== null ? '<img class="story-cover" src="/media/' . $page->cover . '" alt="" loading="lazy">' : '<div class="story-type"><span>PAGE</span><span>↗</span></div>')
                 . '<time datetime="' . self::e($page->updatedAt) . '">' . self::date($page->updatedAt) . '</time><h2>' . self::e($page->title)
                 . '</h2><p>' . self::e($page->excerpt) . '</p><span class="read-story">Read page ↗</span></a></article>';

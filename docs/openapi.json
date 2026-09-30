@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Stage CMS API",
-    "version": "0.4.0",
+    "version": "0.5.0",
     "description": "Humans and agents share the same content operations. All creates are drafts. Reads require a token. Publishing is explicit. Never retry a stale write with a fresh version without reconciling content.",
     "license": {
       "name": "MIT",
@@ -18,7 +18,7 @@
     "/api/pages": {
       "get": {
         "summary": "List current pages",
-        "description": "Required permission: content:read. Returns summaries without body or named fields unless include=body is requested. next_page is null when no further item exists; concurrent writes can move items between requests.",
+        "description": "Required permission: content:read. Returns summaries without body or named fields unless include=body is requested. next_page is null when no further item exists; concurrent writes can move items between requests. The published filter selects latest drafts of pages with a live revision; use /api/pages/{id}/published for live content.",
         "operationId": "get_pages",
         "security": [
           {
@@ -1207,6 +1207,225 @@
           }
         }
       }
+    },
+    "/api/pages/{id}/published": {
+      "get": {
+        "summary": "Read the published revision by page ID",
+        "description": "Requires content:read. Returns the exact live revision, not a later draft; 404 when unpublished or archived. Read the latest draft before writing.",
+        "operationId": "get_pages_id_published",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/pages/{id}/translations": {
+      "get": {
+        "summary": "Read linked translations",
+        "description": "Requires content:read. Current summaries include this page and all linked language versions, including archived pages.",
+        "operationId": "get_pages_id_translations",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "translations"
+                  ],
+                  "properties": {
+                    "translations": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PageSummary"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "Create a translation draft",
+        "description": "Requires content:read and content:write. Copies the current saved source into a separate private draft; does not translate text or publish. Source version must match. One page per locale in each group, including archive. Writes are not idempotent; inspect translations after a lost response.",
+        "operationId": "post_pages_id_translations",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "415": {
+            "$ref": "#/components/responses/Error415"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error422"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "locale",
+                  "slug",
+                  "expected_version"
+                ],
+                "properties": {
+                  "locale": {
+                    "type": "string",
+                    "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
+                    "default": "en",
+                    "description": "A configured locale code; empty discovery map allows any valid code."
+                  },
+                  "slug": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+                    "maxLength": 120
+                  },
+                  "expected_version": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            }
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1461,6 +1680,13 @@
               },
               "message": {
                 "type": "string"
+              },
+              "fields": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Optional validation messages keyed by content field, for example fields.hero.title."
               }
             }
           }
@@ -1541,6 +1767,21 @@
             "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
             "default": "en",
             "description": "A configured locale code; empty discovery map allows any valid code."
+          },
+          "translation_group": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          },
+          "binding": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Application-assigned page name; not writable through the content API."
+          },
+          "path": {
+            "type": "string",
+            "description": "Canonical public path. Stable for a bound page across slug changes."
           }
         },
         "required": [
@@ -1557,7 +1798,10 @@
           "action",
           "updated_at",
           "type",
-          "locale"
+          "locale",
+          "translation_group",
+          "binding",
+          "path"
         ]
       },
       "ContentField": {
@@ -1567,7 +1811,8 @@
           "label",
           "group",
           "multiline",
-          "limit"
+          "limit",
+          "required"
         ],
         "properties": {
           "key": {
@@ -1585,6 +1830,10 @@
           "limit": {
             "type": "integer",
             "minimum": 1
+          },
+          "required": {
+            "type": "boolean",
+            "description": "Nonblank text is required to publish; drafts may remain empty."
           }
         }
       },
