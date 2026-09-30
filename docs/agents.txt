@@ -1,4 +1,4 @@
-# Stage CMS 0.3
+# Stage CMS 0.4
 
 Purpose: manage a publication through the same operations used by its owner.
 Discovery: GET /api/guide is this guide; GET /api/schema is the OpenAPI contract.
@@ -22,13 +22,22 @@ Workflow:
 4. Review the result. Publishing is a separate owner-authorized operation.
 5. POST /api/pages/{id}/publish with the current expected_version when allowed.
 
-POST /api/pages creates a private draft (title, slug, excerpt, body, cover).
+GET /api/types returns installed page types, field definitions, locales, and themes.
+Read it before writing structured pages. Each field has a key and character limit.
+POST /api/pages creates a private draft (title, slug, excerpt, body, cover,
+type, locale, fields). Omitted type is page, locale is en, fields is {}.
+Named fields contain plain text, at most 200,000 bytes of JSON encoding total.
+A type with markdown=false requires an empty body. Only registered fields and
+configured locales are accepted. Empty locale map means any valid language code.
+Type definitions and executable themes are installed by application developers.
 Omitted excerpt/body become empty, omitted cover becomes null. PUT replaces
 these draft fields; it is not a partial patch. Title and slug are required.
 Slug: one lowercase URL segment using letters, digits, single hyphens.
 Body: CommonMark, at most 200,000 UTF-8 bytes, no raw HTML.
 Cover: an existing image ID or null.
-Publishing a changed slug moves the public address; no redirect is created.
+The default theme maps slug to /{slug}; consuming sites may map fixed routes
+to content keys. Read their routing contract before renaming a key. Publishing
+a changed slug creates no redirect. Theme selection is owner-only in Settings.
 
 On 409 stale_revision, preserve your proposed change, re-read, and reconcile.
 Do not silently replace expected_version and retry the same content.
@@ -36,14 +45,14 @@ Writes are not idempotent. If a response is lost, inspect the page and history
 before retrying. A slug is unique, including archived and live page addresses.
 Pages, history, and media use 50 items per page. Follow next_page until null.
 Lists can move during concurrent writes; they are not a stable snapshot.
-Page/history lists omit body. Read one page or revision for full content;
+Page/history lists omit body and fields. Read one page or revision for full content;
 add include=body to a page/history list only when you need the whole batch.
 Error JSON: {"error":{"code":"...", "message":"..."}}.
 401: missing/expired/revoked token; 403: denied permission; 409: conflict;
 422: invalid fields. Do not retry these errors without addressing the cause.
 
 History: GET /api/pages/{id}/history?page=1.
-One revision: GET /api/pages/{id}/history/{version} includes its body.
+One revision: GET /api/pages/{id}/history/{version} includes its body and named fields.
 Restore: POST /api/pages/{id}/restore with revision and expected_version.
 Restore creates a new draft; existing publication remains unchanged.
 Unpublish/archive/recover use POST /api/pages/{id}/{operation} with
@@ -52,7 +61,7 @@ expected_version. Archive unpublishes; recovery is always a private draft.
 Media: GET /api/media?page=1&q=search. Search matches names and descriptions.
 POST /api/media accepts name, base64, and alt.
 JPEG/PNG/WebP only, up to 5 MiB and 16 megapixels. Images are decoded and
-re-encoded. Use returned /media/{id} URLs in Markdown or IDs for a cover.
+re-encoded. Use returned /media/{id} URLs in Markdown or named fields, or IDs for a cover.
 GET /media/{id} accepts the same bearer token for private images.
 PATCH /api/media/{id} accepts alt. DELETE removes only unused images.
 A published page makes referenced images publicly readable.

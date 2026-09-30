@@ -23,7 +23,7 @@ most once per minute; revocation takes effect immediately.
 curl -X POST http://127.0.0.1:8088/api/pages \
   -H "Authorization: Bearer $STAGE_CMS_TOKEN" \
   -H 'Content-Type: application/json' \
-  --data '{"title":"Hello, world","slug":"hello-world","body":"A considered beginning."}'
+  --data '{"title":"Hello, world","slug":"hello-world","body":"The first page."}'
 ```
 
 The response contains the page ID, `version: 1`, and `status: "draft"`.
@@ -37,7 +37,8 @@ curl -X PUT "http://127.0.0.1:8088/api/pages/$PAGE_ID" \
 ```
 
 `PUT` replaces the draft fields. Omitted `excerpt`, `body`, and `cover` become
-empty, empty, and null. The published version stays unchanged. After an
+empty, empty, and null. Omitted `type`, `locale`, and `fields` become `page`,
+`en`, and an empty object. Preserve these values when updating a typed page. The published version stays unchanged. After an
 authorized review, a token with publication scope can publish the saved draft:
 
 ```sh
@@ -63,14 +64,14 @@ creation at the same address. `GET /api/pages?q=hello-world` can locate it.
 ## Reading and recovery
 
 `GET /api/pages` accepts `status=all|draft|published|archived`, `q`, and `page`.
-`GET /api/pages/{id}/history` accepts `page`. Both return summaries without `body`,
+`GET /api/pages/{id}/history` accepts `page`. Both return summaries without `body` or `fields`,
 50 items at most, the current `page`, and `next_page`. The latter is null when
 no further item exists at the time of the query. Lists may move while writers
 work; they are not a transaction-wide snapshot.
 
 Read full content with `GET /api/pages/{id}` or a specific saved revision with
 `GET /api/pages/{id}/history/{version}`. Add `include=body` to page or history
-lists when you need every body in that batch. Omit it when finding a page or
+lists when you need every body and named field in that batch. Omit it when finding a page or
 choosing a revision. Create and update responses always include full content.
 
 `POST /api/pages/{id}/restore` takes `revision` and `expected_version`.
@@ -88,7 +89,7 @@ optional `alt` to `POST /api/media`. Accepted types are JPEG, PNG, and WebP.
 Use the returned ID as a cover or its URL in Markdown.
 
 Images are private until referenced by a published page. A reference is a
-cover ID or `/media/{id}` appearing in the published Markdown. Public copies
+cover ID or `/media/{id}` appearing in the published Markdown or named field. Public copies
 already downloaded cannot be recalled by unpublishing. Fetch private bytes
 with a bearer token at `/media/{id}`.
 
@@ -96,9 +97,33 @@ with a bearer token at `/media/{id}`.
 published cover using the image. `DELETE` refuses any image referenced in
 current content or history.
 
-## Upgrade from 0.2
+## Discover types and languages
 
-Page and history lists now omit `body` by default. Read individual pages or add
-`include=body` if an existing client depends on complete content in lists.
-Media lists are now paginated; follow `next_page` to reach every image.
-The database format, write requests, and individual page responses are unchanged.
+`GET /api/types` requires `content:read`. It returns installed `types`, a
+`locales` code-to-label object, and a `themes` ID-to-label object. An empty locale
+map means any syntactically valid language code is accepted. Each type lists
+its ID, label, Markdown support, and fields with key, label, group, multiline,
+and character limit.
+
+Create or replace a typed draft using `type`, `locale`, and `fields` alongside
+title, slug, excerpt, body, and cover. For example, when a `homepage` type with
+`hero.title` is installed:
+
+```json
+{"title":"Home","slug":"home","type":"homepage","locale":"en","fields":{"hero.title":"Welcome"}}
+```
+
+Only registered fields are writable. A type with `markdown: false` requires an
+empty body. Named fields are plain UTF-8 text, limited to 200,000 bytes of their
+JSON encoding in total and each definition's character limit. Themes and type
+definitions cannot be installed through the content API.
+
+## Upgrade from 0.3
+
+Existing Markdown writes keep their defaults. Full page and revision responses
+now include `type`, `locale`, and `fields`; summaries include only type and
+locale. `include=body` includes named fields too. PUT remains a complete
+replacement, so send all fields you intend to retain. Older clients must not
+edit structured pages without understanding their type and field values.
+
+See [operations](operations.md#updates) for schema and archive compatibility.

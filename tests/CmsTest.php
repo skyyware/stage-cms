@@ -521,4 +521,146 @@ final class CmsTest extends TestCase
         self::assertIsString($bytes);
         return $bytes;
     }
+    public function testStructuredPagesKeepFieldsAcrossPublicationRestoreAndExport(): void
+    {
+        $types = new \StageCms\Content\PageTypes(new \StageCms\Content\PageType('homepage', 'Homepage', [new \StageCms\Content\Field('hero.title', 'Headline')], false));
+        $cms = new Cms($this->cms->config, $types);
+        $draft = new Draft('Home', 'home', '', '', type: 'homepage', locale: 'de', fields: ['hero.title' => 'Hallo']);
+        $page = $cms->pages->create($this->owner, $draft, true);
+        $edited = new Draft('Home', 'home', '', '', type: 'homepage', locale: 'de', fields: ['hero.title' => '<script>private</script>']);
+        $saved = $cms->pages->save($this->owner, $page->id, $edited, 1);
+        self::assertSame('Hallo', $cms->pages->publishedPage('home')->draft->fields['hero.title']);
+        self::assertSame('homepage', $cms->pages->browse($this->owner)->items[0]->type);
+        self::assertArrayNotHasKey('fields', $cms->pages->browse($this->owner)->items[0]->data());
+        $this->fails('stale_revision', fn () => $cms->pages->save($this->owner, $page->id, $draft, 1));
+        $restored = $cms->pages->restore($this->owner, $page->id, 1, $saved->version);
+        self::assertSame($draft->data(), $restored->draft->data());
+        $this->fails('unknown_page_type', fn () => $cms->pages->create($this->owner, new Draft('Bad', 'bad', '', '', type: 'unknown')));
+        $this->fails('invalid_field', fn () => $cms->pages->create($this->owner, new Draft('Bad', 'bad', '', '', type: 'homepage', fields: ['unknown' => 'value'])));
+        $cms->settings->save($this->owner, 'Website', '', 'skyyware');
+        $path = $this->directory . '/structured.zip';
+        file_put_contents($path, (new Archive($cms))->export($this->owner));
+        $target = new Cms(new Config(dirname(__DIR__), $this->directory . '/structured-copy'), $types);
+        (new Archive($target))->restore($this->owner, $path);
+        self::assertSame($draft->data(), $target->pages->get($this->owner, $page->id)->draft->data());
+        self::assertSame('skyyware', $target->settings->get()['theme']);
+        $token = $cms->identity->createToken($this->owner, 'Drafts', ['content:read', 'content:write'], 30);
+        $headers = ['authorization' => 'Bearer ' . $token, 'content-type' => 'application/json'];
+        $kernel = new Kernel($cms);
+        self::assertSame(200, $kernel->handle(new Request('GET', '/api/types', headers: $headers))->status);
+        $response = $kernel->handle(new Request('PUT', '/api/pages/' . $page->id, json_encode($edited->data() + ['expected_version' => $restored->version], JSON_THROW_ON_ERROR), $headers));
+        self::assertSame(200, $response->status);
+        self::assertStringContainsString('hero.title', $response->body);
+    }
+
+    public function testChangingTypeKeepsTextVisibleUntilExplicitlyCleared(): void
+    {
+        $types = new \StageCms\Content\PageTypes(new \StageCms\Content\PageType('homepage', 'Homepage', [new \StageCms\Content\Field('headline', 'Headline')], false));
+        $cms = new Cms($this->cms->config, $types);
+        $page = $cms->pages->create($this->owner, $this->draft(body: 'Keep my Markdown'));
+        $session = $cms->identity->newSession(true);
+        $kernel = new Kernel($cms);
+        $headers = ['cookie' => 'stage_cms=' . $session->secret];
+        $values = $page->draft->data() + ['csrf' => $session->csrf, 'expected_version' => '1', 'intent' => 'type'];
+        $values['type'] = 'homepage';
+        $path = '/admin/pages/' . $page->id;
+        $response = $kernel->handle(new Request('POST', $path, http_build_query($values), $headers));
+        self::assertSame(200, $response->status);
+        self::assertStringContainsString('Keep my Markdown', $response->body);
+        self::assertStringNotContainsString('class="markdown-editor" hidden', $response->body);
+        self::assertSame(1, $cms->pages->get($this->owner, $page->id)->version);
+        $values['intent'] = 'save';
+        self::assertSame(422, $kernel->handle(new Request('POST', $path, http_build_query($values), $headers))->status);
+        $values['body'] = '';
+        $values['fields'] = ['headline' => 'Moved words'];
+        self::assertSame(303, $kernel->handle(new Request('POST', $path, http_build_query($values), $headers))->status);
+        $values['expected_version'] = '2';
+        $values['type'] = 'page';
+        $values['intent'] = 'type';
+        $response = $kernel->handle(new Request('POST', $path, http_build_query($values), $headers));
+        self::assertStringContainsString('Previous fields', $response->body);
+        self::assertStringContainsString('Moved words', $response->body);
+        $values['intent'] = 'save';
+        self::assertSame(422, $kernel->handle(new Request('POST', $path, http_build_query($values), $headers))->status);
+        $values['fields']['headline'] = '';
+        $values['body'] = 'Moved words';
+        self::assertSame(303, $kernel->handle(new Request('POST', $path, http_build_query($values), $headers))->status);
+        $saved = $cms->pages->get($this->owner, $page->id);
+        self::assertSame('page', $saved->type);
+        self::assertSame([], $saved->draft->fields);
+        self::assertSame('Moved words', $saved->draft->body);
+    }
+
+    public function testVersionOneExportStillRestoresIntoTheCurrentSchema(): void
+    {
+        $page = $this->cms->pages->create($this->owner, $this->draft(), true);
+        $path = $this->directory . '/legacy.zip';
+        file_put_contents($path, (new Archive($this->cms))->export($this->owner));
+        $zip = new ZipArchive();
+        self::assertTrue($zip->open($path) === true);
+        $json = $zip->getFromName('content.json');
+        self::assertIsString($json);
+        $data = Input::object(json_decode($json, true, flags: JSON_THROW_ON_ERROR));
+        $data['format'] = 'stage-cms/1';
+        $settings = Input::object($data['settings']);
+        unset($settings['theme']);
+        $data['settings'] = $settings;
+        $tables = Input::object($data['tables']);
+        $rows = $this->cms->db->all('SELECT page_id, version, title, slug, excerpt, body, cover, action, actor, created_at FROM revisions');
+        $tables['revisions'] = $rows;
+        $data['tables'] = $tables;
+        $zip->addFromString('content.json', json_encode($data, JSON_THROW_ON_ERROR));
+        $zip->close();
+        $target = new Cms(new Config(dirname(__DIR__), $this->directory . '/legacy-copy'));
+        (new Archive($target))->restore($this->owner, $path);
+        self::assertSame($page->draft->data(), $target->pages->publishedPage($page->slug)->draft->data());
+        self::assertSame('', $target->settings->get()['theme']);
+    }
+
+    public function testApiAlwaysRepresentsFieldAndLocaleMapsAsObjects(): void
+    {
+        $page = $this->cms->pages->create($this->owner, $this->draft());
+        $token = $this->cms->identity->createToken($this->owner, 'Reader', ['content:read']);
+        $kernel = new Kernel($this->cms);
+        $headers = ['authorization' => 'Bearer ' . $token];
+        $response = $kernel->handle(new Request('GET', '/api/pages/' . $page->id, headers: $headers));
+        self::assertStringContainsString('"fields":{}', $response->body);
+        $response = $kernel->handle(new Request('GET', '/api/types', headers: $headers));
+        self::assertStringContainsString('"locales":{}', $response->body);
+    }
+
+    public function testThemeSelectionUsesInstalledChoicesAndRejectsUnknownThemes(): void
+    {
+        $theme = new class implements \StageCms\Presentation\Theme {
+            public function index(int $page): \Stage\Http\Response { return \Stage\Http\Response::text('Website'); }
+            public function page(\StageCms\Content\Page $page, bool $preview = false): \Stage\Http\Response { return \Stage\Http\Response::text($page->title); }
+        };
+        $themes = new \StageCms\Presentation\Themes($this->cms, new \StageCms\Presentation\ThemeOption('website', 'Website', $theme));
+        $kernel = new Kernel($this->cms, $themes);
+        $session = $this->cms->identity->login($this->cms->identity->newSession(), 'editor@example.test', 'a long test-only password', 'local');
+        $headers = ['cookie' => 'stage_cms=' . $session->secret, 'content-type' => 'application/x-www-form-urlencoded'];
+        $settings = $kernel->handle(new Request('GET', '/admin/settings', headers: $headers));
+        self::assertStringContainsString('value="website" selected', $settings->body);
+        $response = $kernel->handle(new Request('POST', '/admin/settings', http_build_query(['csrf' => $session->csrf, 'title' => 'Site', 'description' => '', 'theme' => 'website']), $headers));
+        self::assertSame(303, $response->status);
+        self::assertSame('website', $this->cms->settings->get()['theme']);
+        self::assertSame('Website', $kernel->handle(new Request('GET', '/'))->body);
+        $response = $kernel->handle(new Request('POST', '/admin/settings', http_build_query(['csrf' => $session->csrf, 'title' => 'Bad', 'description' => '', 'theme' => 'unknown']), $headers));
+        self::assertSame(422, $response->status);
+        self::assertSame('Site', $this->cms->settings->get()['title']);
+    }
+
+    public function testVersionOneDatabaseMigratesWithoutChangingPublishedContent(): void
+    {
+        $page = $this->cms->pages->create($this->owner, $this->draft(), true);
+        $this->cms->db->pdo->exec('ALTER TABLE revisions DROP COLUMN type; ALTER TABLE revisions DROP COLUMN locale; ALTER TABLE revisions DROP COLUMN fields; ALTER TABLE settings DROP COLUMN theme; PRAGMA user_version = 1;');
+        $upgraded = new Cms($this->cms->config);
+        $restored = $upgraded->pages->publishedPage($page->slug);
+        self::assertSame($page->draft->data(), $restored->draft->data());
+        $version = $upgraded->db->pdo->query('PRAGMA user_version');
+        self::assertNotFalse($version);
+        self::assertSame(2, $version->fetchColumn());
+        $upgraded->db->migrate();
+        self::assertSame($page->version, $upgraded->pages->get($this->owner, $page->id)->version);
+    }
 }

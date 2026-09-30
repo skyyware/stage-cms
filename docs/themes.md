@@ -1,36 +1,107 @@
-# Use your own frontend
+# Page types, languages, and themes
 
-Install Stage CMS with `composer require skyyware/stage-cms:^0.3` in an application.
-The application owns its public design and route composition. Stage CMS owns
-identity, editing, revisions, publication, media, and agent access.
+The application owns public routes and design. Stage CMS owns editing,
+identity, revisions, publication, media, and agent access. A page type names
+its content fields; a theme renders that content.
 
-Implement `StageCms\Presentation\Theme` with two methods:
+## Install in an application
 
-- `index(int $page): Response` renders the publication index. Read published
-  summaries through `Pages::publication()`. Use `Pages::publishedPage()` when
-  the complete published content is needed.
+While the repositories are private, add both VCS repositories to the consuming
+application's `composer.json`. Composer does not inherit dependency repositories.
+Use an account with access; keep credentials outside the repository.
+
+```json
+{
+  "repositories": [
+    {"type": "vcs", "url": "git@github.com:skyyware/stage-cms.git"},
+    {"type": "vcs", "url": "git@github.com:skyyware/stage.git"}
+  ],
+  "require": {"skyyware/stage-cms": "^0.4.0"}
+}
+```
+
+## Define content
+
+```php
+use StageCms\Cms;
+use StageCms\Content\Field;
+use StageCms\Content\PageType;
+use StageCms\Content\PageTypes;
+use StageCms\Infrastructure\Config;
+
+$types = new PageTypes(new PageType('homepage', 'Homepage', [
+    new Field('hero.title', 'Headline', 'Hero', limit: 200),
+    new Field('hero.copy', 'Introduction', 'Hero', multiline: true),
+], markdown: false));
+$cms = new Cms(Config::environment($applicationRoot), $types, [
+    'en' => 'English',
+    'de' => 'Deutsch',
+]);
+```
+
+The default `page` type accepts Markdown. Additional types may use Markdown,
+named fields, or both. A field has a stable key, label, group, multiline flag,
+and character limit. Unknown types, unsupported locales, unknown fields, and
+oversized values fail before writing. Empty fields are allowed. Field values
+are plain text; the theme escapes them in their output context.
+
+Leave the locale map empty to accept any valid language code. When a map is
+provided, both browser and API writes enforce its choices. Language is revision
+metadata; the application owns translation relationships and URL routing.
+
+In the editor choose **Page type**, then **Apply type**. This changes the form
+without saving. Incompatible text remains visible so it can be moved or cleared.
+Select **Language**, complete the fields, and save a draft. Type, locale, fields,
+Markdown, and cover participate in the same publication and history workflow.
+
+Types are trusted application definitions, never code supplied by content.
+Removing a type does not erase its stored pages, but further edits require an
+installed definition. Keep definitions compatible with revisions you may restore.
+
+## Render the public site
+
+Implement `StageCms\Presentation\Theme`:
+
+- `index(int $page): Response` reads published content for a listing or homepage.
 - `page(Page $page, bool $preview = false): Response` renders the supplied revision.
-  The kernel supplies a published revision for public URLs and the current saved
-  draft only after authenticating an owner for a private preview.
 
-Pass the theme to `new StageCms\Http\Kernel($cms, $theme)`. Use the supplied
-page in previews; reading its published counterpart would conceal draft edits.
-Escape plain text and render Markdown through the safe Markdown renderer.
-Themes are trusted application code, never executable content from the editor.
+Read `$page->type`, `$page->locale`, and `$page->draft->fields`. Read published
+summaries with `Pages::publication()` and full pages with `publishedPage()`.
+For a preview, render the supplied draft instead of re-reading its publication.
+Escape plain text; render Markdown through `Presentation\Markdown`.
 
-Create `Cms` with `Config::environment($applicationRoot)` and a private data
-directory. Forward requests, uploaded files, and the connecting IP to the kernel.
-Keep its response headers, and send HEAD responses without a body. The public
-entrypoint in this package demonstrates multipart parsing and size limits.
+Register installed choices with stable IDs:
 
-Route `/admin`, `/api`, `/media`, and `/assets/cms.css`, `/assets/cms.js`,
-`/assets/mark.svg` to the kernel. It serves its own assets, OpenAPI schema, and
-agent guide at `/api/guide` from the installed package. A consuming site need
-not copy them and may use `/llms.txt` for its own overview.
-The default theme remains available as `Presentation\Publication`.
+```php
+use StageCms\Http\Kernel;
+use StageCms\Presentation\ThemeOption;
+use StageCms\Presentation\Themes;
 
-For CLI setup, export, and restore, set `CMS_ROOT` to the application's root,
-`CMS_DATA_DIR` to the same private storage used by HTTP, and `CMS_URL` to its
-origin, then run `php vendor/skyyware/stage-cms/bin/cms` with the usual command.
-Do not copy credentials or development data into a release archive. Keep
-persistent data outside immutable releases and test content recovery separately.
+$themes = new Themes($cms, new ThemeOption('website', 'Website', $websiteTheme));
+$kernel = new Kernel($cms, $themes);
+```
+
+**Settings → Theme** selects one of these installed options. The selection
+applies immediately to the public site and previews; it is not a draft page
+change. Register more options only when their rendering code exists. An unknown
+stored theme fails explicitly; reinstall it or choose an available option.
+
+Passing a single Theme directly to Kernel remains supported, under the ID
+`custom`. Omitting it uses the built-in `publication` theme. Keep a stable ID
+when adding a registry to an existing installation.
+
+## Compose routes and storage
+
+Forward `/admin`, `/api`, `/media`, `/health`, and the package's `/assets/`
+resources to the kernel, including the bundled fonts. The kernel serves its
+agent guide at `/api/guide` and schema at `/api/schema`; the site can keep its
+own `/llms.txt`. Preserve response headers and omit bodies on HEAD responses.
+
+The default publication maps `slug` to `/{slug}`. An application can map fixed
+routes such as `/de` to a published content key such as `de-home`. Document
+those mappings for editors and agents. Moving a key does not create redirects.
+
+Use a private persistent data directory outside public/ and release folders.
+Set `CMS_ROOT`, `CMS_DATA_DIR`, and `CMS_URL` consistently for HTTP and the CLI.
+Run the installed `vendor/skyyware/stage-cms/bin/cms` for setup, export, restore,
+and password reset. Never ship credentials or development data in a release.

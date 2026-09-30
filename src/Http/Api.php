@@ -8,6 +8,8 @@ use Stage\Http\Response;
 use Stage\Security\Caller;
 use StageCms\Cms;
 use StageCms\Content\Draft;
+use StageCms\Content\Page;
+use StageCms\Content\PageSummary;
 use StageCms\Failure;
 use StageCms\Input;
 
@@ -18,12 +20,12 @@ final readonly class Api
     public function pages(Request $request): Response
     {
         if ($request->method === 'POST') {
-            return Response::json($this->cms->pages->create($this->caller, Draft::fromInput($this->context->json(['title', 'slug', 'excerpt', 'body', 'cover'])))->data(), 201);
+            return Response::json(self::pageData($this->cms->pages->create($this->caller, Draft::fromInput($this->context->json(['title', 'slug', 'excerpt', 'body', 'cover', 'type', 'locale', 'fields'])))), 201);
         }
         $query = $this->context->query();
         $number = Input::integer($query['page'] ?? 1);
         $pages = $this->cms->pages->browse($this->caller, Input::text($query, 'status', 'all'), Input::text($query, 'q', ''), $number, $this->includeBody());
-        return Response::json(['pages' => array_map(fn ($page) => $page->data(),
+        return Response::json(['pages' => array_map(self::pageData(...),
             $pages->items), 'page' => $number, 'next_page' => $pages->nextPage]);
     }
 
@@ -31,24 +33,34 @@ final readonly class Api
     {
         $id = $request->parameters['id'];
         if ($request->method === 'GET' || $request->method === 'HEAD') {
-            return Response::json($this->cms->pages->get($this->caller, $id)->data());
+            return Response::json(self::pageData($this->cms->pages->get($this->caller, $id)));
         }
-        $input = $this->context->json(['title', 'slug', 'excerpt', 'body', 'cover', 'expected_version']);
-        return Response::json($this->cms->pages->save($this->caller, $id, Draft::fromInput($input),
-            Input::integer($input['expected_version'] ?? null))->data());
+        $input = $this->context->json(['title', 'slug', 'excerpt', 'body', 'cover', 'type', 'locale', 'fields', 'expected_version']);
+        return Response::json(self::pageData($this->cms->pages->save($this->caller, $id, Draft::fromInput($input),
+            Input::integer($input['expected_version'] ?? null))));
     }
 
     public function history(Request $request): Response
     {
         $number = Input::integer($this->context->query()['page'] ?? 1);
         $revisions = $this->cms->pages->revisions($this->caller, $request->parameters['id'], $number, $this->includeBody());
-        return Response::json(['revisions' => array_map(fn ($page) => $page->data(), $revisions->items),
+        return Response::json(['revisions' => array_map(self::pageData(...), $revisions->items),
             'page' => $number, 'next_page' => $revisions->nextPage]);
     }
 
     public function revision(Request $request): Response
     {
-        return Response::json($this->cms->pages->revision($this->caller, $request->parameters['id'], Input::integer($request->parameters['version']))->data());
+        return Response::json(self::pageData($this->cms->pages->revision($this->caller, $request->parameters['id'], Input::integer($request->parameters['version']))));
+    }
+
+    /** @return array<string, mixed> */
+    private static function pageData(PageSummary $page): array
+    {
+        $data = $page->data();
+        if ($page instanceof Page) {
+            $data['fields'] = (object) $page->draft->fields;
+        }
+        return $data;
     }
 
     private function includeBody(): bool
@@ -73,7 +85,7 @@ final readonly class Api
             'restore' => $this->cms->pages->restore($this->caller, $id, Input::integer($input['revision'] ?? null), $version),
             default => throw new Failure(404, 'not_found', 'That operation does not exist.'),
         };
-        return Response::json($page->data());
+        return Response::json(self::pageData($page));
     }
 
     public function media(Request $request): Response

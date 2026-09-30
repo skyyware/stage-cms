@@ -1,39 +1,41 @@
-# A quiet place to publish
+# Design
 
-Writing is the primary task. Pages open directly into an editor. Navigation
-contains Pages, Media, and Agents. Site settings and the public site remain
-secondary. Every visible control performs a real action.
-
-The interface uses warm paper, near-black text, thin rules, and a restrained
-orange accent. System sans-serif type handles controls. A serif display face
-gives titles and public reading pages their rhythm. Code examples use monospace.
-
-## Tokens
+Stage CMS uses the SKYYWARE identity: navy navigation, a light workspace,
+D-DIN type, and a blue action color. The compact S mark works at favicon size.
+The writing area uses the same type family as the controls.
 
 | Token | Value |
 | --- | --- |
-| Canvas | #f6f5f1 |
+| Canvas | #f6f7f8 |
 | Paper | #ffffff |
-| Text | #242923 |
-| Muted text | #62695f |
-| Rule | #dedfd7 |
-| Accent | #bb3c1c |
-| Soft accent | #f8eae3 |
-| Success | #426348 |
+| Navigation | #010711 |
+| Text | #101827 |
+| Muted text | #536071 |
+| Rule | #d9dee6 |
+| Accent | #0c4f91 |
+| Soft accent | #edf3f8 |
 | Control radius | 6px |
-| Reading width | 720px |
 | Sidebar width | 224px |
 
-Use generous space around the editor, compact metadata, and visible keyboard
-focus. Status always has text as well as color. Preserve input when a save
-fails. Make a stale revision understandable without silently replacing work.
+Fonts are served locally. D-DIN's OFL license ships alongside the font files.
+The SVG mark scales without a raster asset or external service.
 
-The editor loads only its selected cover. Choosing another image saves the draft
-and opens a searchable visual library. History shows revision summaries first;
-opening one revision loads its reading view. Both collections have bounded
-pages, clear empty states, and real next-page links.
+Pages, Media, and Agents are the primary navigation. Settings holds site-wide
+choices. The editor groups a type's fields by purpose. Additional groups can
+collapse while their values remain part of the saved revision. Page type,
+language, address, summary, and cover sit beside the writing area on desktop
+and below it on mobile.
 
-On narrow screens, navigation becomes a compact top bar and the editor metadata
-moves below the writing area. Forms work without JavaScript. Enhancements add
-formatting shortcuts, keyboard saving, file selection feedback, and dirty-state
-protection. Motion is brief and respects reduced-motion preferences.
+Inputs, textareas, and selects have no CSS outlines. Focus changes their border
+and background and adds an inset blue bar. Forced-color mode uses the system
+highlight border. Links and buttons retain visible keyboard focus. Never
+remove focus visibility to simplify the appearance.
+
+Saving a draft preserves the current publication. Preview shows saved work;
+publish makes it public. History restores a prior revision as a new draft.
+Changing type keeps incompatible content visible until the editor moves or
+clears it. Save errors retain the submitted text and revision number.
+
+Use direct labels and state what an action changes. Status needs text as well
+as color. Forms work without JavaScript; enhancements handle formatting,
+keyboard saving, word count, and unsaved changes. Respect reduced motion.

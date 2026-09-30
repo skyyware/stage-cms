@@ -11,7 +11,8 @@ use StageCms\Listing;
 
 final readonly class Pages
 {
-    public function __construct(private Database $db) {}
+    /** @param array<string, string> $locales */
+    public function __construct(private Database $db, private PageTypes $types = new PageTypes(), private array $locales = []) {}
 
     /** @return list<Page> */
     public function list(Caller $caller, string $status = 'all', string $search = '', int $page = 1): array
@@ -25,8 +26,8 @@ final readonly class Pages
     private static function select(bool $published = false, bool $includeBody = false): string
     {
         $version = $published ? 'p.published_version' : 'p.version';
-        return 'SELECT p.id, ' . $version . ' AS version, p.published_version, p.archived, r.title, r.slug, r.excerpt, r.cover, r.actor, r.action, r.created_at'
-            . ($includeBody ? ', r.body' : '') . ' FROM pages p JOIN revisions r ON r.page_id = p.id AND r.version = ' . $version;
+        return 'SELECT p.id, ' . $version . ' AS version, p.published_version, p.archived, r.title, r.slug, r.excerpt, r.cover, r.type, r.locale, r.actor, r.action, r.created_at'
+            . ($includeBody ? ', r.body, r.fields' : '') . ' FROM pages p JOIN revisions r ON r.page_id = p.id AND r.version = ' . $version;
     }
 
     private static function filter(string $status): string
@@ -55,8 +56,8 @@ final readonly class Pages
     {
         $caller->require('content:read');
         $this->assertExists($id);
-        $rows = $this->db->all('SELECT p.id, r.version, p.published_version, p.archived, r.title, r.slug, r.excerpt, r.cover, r.actor, r.action, r.created_at'
-            . ($includeBody ? ', r.body' : '') . ' FROM revisions r JOIN pages p ON p.id = r.page_id WHERE p.id = :id ORDER BY r.version DESC LIMIT 51 OFFSET :offset',
+        $rows = $this->db->all('SELECT p.id, r.version, p.published_version, p.archived, r.title, r.slug, r.excerpt, r.cover, r.type, r.locale, r.actor, r.action, r.created_at'
+            . ($includeBody ? ', r.body, r.fields' : '') . ' FROM revisions r JOIN pages p ON p.id = r.page_id WHERE p.id = :id ORDER BY r.version DESC LIMIT 51 OFFSET :offset',
             ['id' => $id, 'offset' => Listing::offset($page)]);
         return new Listing(array_map($includeBody ? Page::fromRow(...) : PageSummary::fromRow(...), $rows), $page);
     }
@@ -64,7 +65,7 @@ final readonly class Pages
     public function revision(Caller $caller, string $id, int $version): Page
     {
         $caller->require('content:read');
-        $row = $this->db->one('SELECT p.id, r.version, p.published_version, p.archived, r.title, r.slug, r.excerpt, r.body, r.cover, r.actor, r.action, r.created_at FROM revisions r JOIN pages p ON p.id = r.page_id WHERE p.id = :id AND r.version = :version',
+        $row = $this->db->one('SELECT p.id, r.version, p.published_version, p.archived, r.title, r.slug, r.excerpt, r.body, r.fields, r.cover, r.type, r.locale, r.actor, r.action, r.created_at FROM revisions r JOIN pages p ON p.id = r.page_id WHERE p.id = :id AND r.version = :version',
             ['id' => $id, 'version' => $version]);
         if ($row === null) {
             throw new Failure(404, 'not_found', 'That revision does not exist.');
@@ -91,7 +92,7 @@ final readonly class Pages
         $caller->require('content:read');
         $this->load($id);
         return array_map(Page::fromRow(...), $this->db->all(
-            'SELECT p.id, r.version, p.published_version, p.archived, r.title, r.slug, r.excerpt, r.body, r.cover, r.actor, r.action, r.created_at FROM revisions r JOIN pages p ON p.id = r.page_id WHERE p.id = :id ORDER BY r.version DESC LIMIT 50 OFFSET :offset',
+            'SELECT p.id, r.version, p.published_version, p.archived, r.title, r.slug, r.excerpt, r.body, r.fields, r.cover, r.type, r.locale, r.actor, r.action, r.created_at FROM revisions r JOIN pages p ON p.id = r.page_id WHERE p.id = :id ORDER BY r.version DESC LIMIT 50 OFFSET :offset',
             ['id' => $id, 'offset' => Listing::offset($page)]));
     }
 
@@ -143,11 +144,11 @@ final readonly class Pages
     public function restore(Caller $caller, string $id, int $version, int $expectedVersion): Page
     {
         $caller->require('content:read');
-        $row = $this->db->one('SELECT title, slug, excerpt, body, cover FROM revisions WHERE page_id = :id AND version = :version', ['id' => $id, 'version' => $version]);
+        $row = $this->db->one('SELECT title, slug, excerpt, body, cover, type, locale, fields FROM revisions WHERE page_id = :id AND version = :version', ['id' => $id, 'version' => $version]);
         if ($row === null) {
             throw new Failure(404, 'not_found', 'That revision does not exist.');
         }
-        return $this->change($caller, $id, $expectedVersion, 'restored', Draft::fromInput($row));
+        return $this->change($caller, $id, $expectedVersion, 'restored', Draft::fromRow($row));
     }
 
     /** @return list<Page> */
@@ -217,6 +218,10 @@ final readonly class Pages
 
     private function assertAvailable(Draft $draft, string $id): void
     {
+        $this->types->validate($draft);
+        if ($this->locales !== [] && !isset($this->locales[$draft->locale])) {
+            throw new Failure(422, 'unsupported_language', 'Choose a language supported by this site.');
+        }
         if ($this->db->one('SELECT id FROM pages WHERE id != :id AND (slug = :slug OR published_slug = :slug)', ['id' => $id, 'slug' => $draft->slug]) !== null) {
             throw new Failure(409, 'slug_taken', 'Another page already uses this address, including pages in the archive.');
         }
@@ -229,8 +234,8 @@ final readonly class Pages
 
     private function record(string $id, int $version, Draft $draft, Caller $caller, string $action): void
     {
-        $this->db->execute('INSERT INTO revisions (page_id, version, title, slug, excerpt, body, cover, action, actor, created_at) VALUES (:id, :version, :title, :slug, :excerpt, :body, :cover, :action, :actor, :created)',
-            array_merge($draft->data(), ['id' => $id, 'version' => $version, 'action' => $action, 'actor' => $caller->id ?? 'unknown', 'created' => gmdate('c')]));
+        $this->db->execute('INSERT INTO revisions (page_id, version, title, slug, excerpt, body, cover, type, locale, fields, action, actor, created_at) VALUES (:id, :version, :title, :slug, :excerpt, :body, :cover, :type, :locale, :fields, :action, :actor, :created)',
+            array_merge($draft->data(), ['fields' => json_encode($draft->fields, JSON_THROW_ON_ERROR), 'id' => $id, 'version' => $version, 'action' => $action, 'actor' => $caller->id ?? 'unknown', 'created' => gmdate('c')]));
         foreach ($this->mediaIds($draft) as $mediaId) {
             $this->db->execute('INSERT INTO revision_media VALUES (:id, :version, :media)', ['id' => $id, 'version' => $version, 'media' => $mediaId]);
         }
@@ -239,7 +244,7 @@ final readonly class Pages
     /** @return list<string> */
     private function mediaIds(Draft $draft): array
     {
-        preg_match_all('~/media/([a-f0-9]{32})(?![a-f0-9])~', $draft->body, $matches);
+        preg_match_all('~/media/([a-f0-9]{32})(?![a-f0-9])~', $draft->body . json_encode($draft->fields, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES), $matches);
         $ids = $matches[1];
         if ($draft->cover !== null) {
             $ids[] = $draft->cover;

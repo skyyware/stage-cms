@@ -14,20 +14,23 @@ use StageCms\Input;
 use StageCms\Presentation\View;
 use StageCms\Presentation\Publication;
 use StageCms\Presentation\Theme;
+use StageCms\Presentation\Themes;
+use StageCms\Presentation\ThemeOption;
 
 final readonly class Kernel
 {
-    private Theme $theme;
+    private Themes $theme;
 
     public function __construct(private Cms $cms, ?Theme $theme = null)
     {
-        $this->theme = $theme ?? new Publication($cms);
+        $this->theme = $theme instanceof Themes ? $theme : new Themes($cms,
+            new ThemeOption($theme === null ? 'publication' : 'custom', $theme === null ? 'Publication' : 'Custom site', $theme ?? new Publication($cms)));
     }
 
     /** @param array<string, mixed> $uploads */
     public function handle(Request $request, array $uploads = [], string $address = 'local'): Response
     {
-        $view = new View($this->cms->settings->get()['title']);
+        $view = new View($this->cms->settings->get()['title'], types: $this->cms->types, locales: $this->cms->locales);
         $api = str_starts_with($request->path, '/api/');
         try {
             $response = $this->dispatch(new Context($request, $uploads, $address), $view);
@@ -58,7 +61,7 @@ final readonly class Kernel
     private function dispatch(Context $context, View $view): Response
     {
         $request = $context->request;
-        $assets = ['/assets/cms.css' => 'text/css', '/assets/cms.js' => 'text/javascript', '/assets/mark.svg' => 'image/svg+xml'];
+        $assets = ['/assets/cms.css' => 'text/css', '/assets/cms.js' => 'text/javascript', '/assets/mark.svg' => 'image/svg+xml', '/assets/D-DIN.otf' => 'font/otf', '/assets/D-DIN-Bold.otf' => 'font/otf', '/assets/D-DIN-OFL.txt' => 'text/plain'];
         if (isset($assets[$request->path])) {
             if (!in_array($request->method, ['GET', 'HEAD'], true)) {
                 return new Response('', 405, ['allow' => 'GET, HEAD']);
@@ -96,6 +99,7 @@ final readonly class Kernel
             $caller = $this->cms->identity->authenticateToken($request->headers['authorization'] ?? '');
             $api = new Api($this->cms, $context, $caller);
             return (new Application(
+                new Route('GET', '/api/types', fn () => Response::json(['types' => $this->cms->types->data(), 'locales' => (object) $this->cms->locales, 'themes' => array_map(fn ($option): string => $option->label, $this->theme->all)])),
                 new Route('GET', '/api/pages', $api->pages(...)),
                 new Route('POST', '/api/pages', $api->pages(...)),
                 new Route('GET', '/api/pages/{id}', $api->page(...)),

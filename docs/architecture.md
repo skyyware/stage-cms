@@ -19,7 +19,8 @@ the new revision, and the publication pointer together.
 ## Owners
 
 - Identity owns the local owner, password verification, sessions, and scoped tokens.
-- Content owns pages, slugs, revisions, publication, and archive transitions.
+- Content owns pages, slugs, page type validation, languages, named fields,
+  revisions, publication, and archive transitions.
 - Media owns validated image bytes and their metadata.
 - Infrastructure owns database setup and portable exports.
 - HTTP parses external values, authenticates callers, checks browser CSRF, and translates errors.
@@ -36,7 +37,7 @@ Runtime is outside public/ and Git. SQLite uses foreign keys, WAL, a busy timeou
 and immediate write transactions. Images use generated names and validated
 content types. The public site reads published revisions only.
 
-Workspace and API lists select metadata without Markdown bodies. A bounded
+Workspace and API lists select metadata without Markdown bodies or named field payloads. A bounded
 query reads one extra row to determine whether a next page exists. Individual
 reads load complete content. The PHP operations `Pages::browse()`,
 `Pages::revisions()`, `Pages::publication()`, and `Library::browse()` return a
@@ -49,11 +50,24 @@ Agent authentication reads current credentials on every request. It writes the
 last-use timestamp at most once per minute per token, so repeated reads do not
 continually compete with content writes for SQLite's single writer.
 
+## Content and presentation
+
+Schema 2 stores `type`, `locale`, and JSON `fields` with every revision, and a
+selected theme ID in settings. Existing schema 1 revisions migrate to the
+Markdown `page` type, language `en`, and empty fields. Migration rechecks the
+version under the write lock. Already-current reads need no migration lock.
+
+Page type definitions validate writes in the content operation, so browser,
+API, and PHP callers use the same rules. Installed theme definitions belong to
+the consuming application. Theme selection changes presentation, not content.
+Publication makes image references in named fields public on the same terms as
+Markdown references. History retains those references for safe restoration.
+
 ## Alternatives
 
 A separate JavaScript application and API would duplicate state and deployment
-work in this first workflow. A general content-schema platform would add choices
-before writing the first page. Files alone would require another locking and
+work in this first workflow. Application-defined text fields cover structured pages without introducing an
+executable template language or a general schema platform. Files alone would require another locking and
 index design for revisions and concurrent human/agent writes. SQLite keeps the
 initial deployment and transaction boundary in one place.
 

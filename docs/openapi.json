@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Stage CMS API",
-    "version": "0.3.0",
+    "version": "0.4.0",
     "description": "Humans and agents share the same content operations. All creates are drafts. Reads require a token. Publishing is explicit. Never retry a stale write with a fresh version without reconciling content.",
     "license": {
       "name": "MIT",
@@ -18,7 +18,7 @@
     "/api/pages": {
       "get": {
         "summary": "List current pages",
-        "description": "Required permission: content:read. Returns summaries without body unless include=body is requested. next_page is null when no further item exists; concurrent writes can move items between requests.",
+        "description": "Required permission: content:read. Returns summaries without body or named fields unless include=body is requested. next_page is null when no further item exists; concurrent writes can move items between requests.",
         "operationId": "get_pages",
         "security": [
           {
@@ -128,7 +128,7 @@
           {
             "name": "include",
             "in": "query",
-            "description": "Omit for summaries. Use body to include complete Markdown in every result.",
+            "description": "Omit for summaries. Use body to include Markdown and named fields in every result.",
             "schema": {
               "type": "string",
               "enum": [
@@ -324,7 +324,7 @@
     "/api/pages/{id}/history": {
       "get": {
         "summary": "Read revision history",
-        "description": "Required permission: content:read. Returns summaries without body unless include=body is requested. next_page is null when no further item exists; concurrent writes can move items between requests.",
+        "description": "Required permission: content:read. Returns summaries without body or named fields unless include=body is requested. next_page is null when no further item exists; concurrent writes can move items between requests.",
         "operationId": "get_pages_id_history",
         "security": [
           {
@@ -422,7 +422,7 @@
           {
             "name": "include",
             "in": "query",
-            "description": "Omit for summaries. Use body to include complete Markdown in every result.",
+            "description": "Omit for summaries. Use body to include Markdown and named fields in every result.",
             "schema": {
               "type": "string",
               "enum": [
@@ -1177,6 +1177,36 @@
           }
         }
       }
+    },
+    "/api/types": {
+      "get": {
+        "summary": "Discover installed types, fields, languages, and themes",
+        "description": "Requires content:read. Read definitions before writing structured pages. Theme selection is owner-only in Settings.",
+        "operationId": "get_types",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Installed content and presentation choices",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentTypes"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1184,7 +1214,7 @@
       "bearerAuth": {
         "type": "http",
         "scheme": "bearer",
-        "bearerFormat": "stg_…"
+        "bearerFormat": "stg_\u2026"
       }
     },
     "schemas": {
@@ -1222,6 +1252,29 @@
             ],
             "pattern": "^[a-f0-9]{32}$",
             "default": null
+          },
+          "type": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,59}$",
+            "default": "page",
+            "description": "An installed page type ID from /api/types."
+          },
+          "locale": {
+            "type": "string",
+            "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
+            "default": "en",
+            "description": "A configured locale code; empty discovery map allows any valid code."
+          },
+          "fields": {
+            "type": "object",
+            "propertyNames": {
+              "pattern": "^[a-z][a-z0-9_.-]{0,119}$"
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "description": "Registered plain-text fields. Definition-specific character limits apply. Combined JSON encoding is at most 200,000 bytes."
           }
         },
         "additionalProperties": false
@@ -1265,6 +1318,29 @@
           "expected_version": {
             "type": "integer",
             "minimum": 1
+          },
+          "type": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,59}$",
+            "default": "page",
+            "description": "An installed page type ID from /api/types."
+          },
+          "locale": {
+            "type": "string",
+            "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
+            "default": "en",
+            "description": "A configured locale code; empty discovery map allows any valid code."
+          },
+          "fields": {
+            "type": "object",
+            "propertyNames": {
+              "pattern": "^[a-z][a-z0-9_.-]{0,119}$"
+            },
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "description": "Registered plain-text fields. Definition-specific character limits apply. Combined JSON encoding is at most 200,000 bytes."
           }
         },
         "additionalProperties": false
@@ -1290,13 +1366,25 @@
           {
             "type": "object",
             "required": [
-              "body"
+              "body",
+              "fields"
             ],
             "properties": {
               "body": {
                 "type": "string",
                 "description": "CommonMark text, at most 200,000 UTF-8 bytes. Raw HTML is removed.",
                 "default": ""
+              },
+              "fields": {
+                "type": "object",
+                "propertyNames": {
+                  "pattern": "^[a-z][a-z0-9_.-]{0,119}$"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "default": {},
+                "description": "Registered plain-text fields. Definition-specific character limits apply. Combined JSON encoding is at most 200,000 bytes."
               }
             }
           }
@@ -1441,6 +1529,18 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "type": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,59}$",
+            "default": "page",
+            "description": "An installed page type ID from /api/types."
+          },
+          "locale": {
+            "type": "string",
+            "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$",
+            "default": "en",
+            "description": "A configured locale code; empty discovery map allows any valid code."
           }
         },
         "required": [
@@ -1455,8 +1555,92 @@
           "status",
           "actor",
           "action",
-          "updated_at"
+          "updated_at",
+          "type",
+          "locale"
         ]
+      },
+      "ContentField": {
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "group",
+          "multiline",
+          "limit"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "group": {
+            "type": "string"
+          },
+          "multiline": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      },
+      "PageType": {
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "markdown",
+          "fields"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "markdown": {
+            "type": "boolean"
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContentField"
+            }
+          }
+        }
+      },
+      "ContentTypes": {
+        "type": "object",
+        "required": [
+          "types",
+          "locales",
+          "themes"
+        ],
+        "properties": {
+          "types": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PageType"
+            }
+          },
+          "locales": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "themes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
       }
     },
     "responses": {

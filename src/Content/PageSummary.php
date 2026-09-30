@@ -19,6 +19,8 @@ readonly class PageSummary
         public string $updatedAt,
         public string $actor,
         public string $action,
+        public string $type = 'page',
+        public string $locale = 'en',
     ) {}
 
     /** @param array<string, mixed> $row */
@@ -27,7 +29,7 @@ readonly class PageSummary
         return new self(Input::text($row, 'id'), Input::text($row, 'title'), Input::text($row, 'slug'),
             Input::text($row, 'excerpt'), Input::optional($row, 'cover'), Input::integer($row['version']),
             $row['published_version'] === null ? null : Input::integer($row['published_version']),
-            $row['archived'] === 1, Input::text($row, 'created_at'), Input::text($row, 'actor'), Input::text($row, 'action'));
+            $row['archived'] === 1, Input::text($row, 'created_at'), Input::text($row, 'actor'), Input::text($row, 'action'), Input::text($row, 'type', 'page'), Input::text($row, 'locale', 'en'));
     }
 
     public function status(): string
@@ -35,11 +37,11 @@ readonly class PageSummary
         return $this->archived ? 'archived' : ($this->publishedVersion === null ? 'draft' : ($this->publishedVersion === $this->version ? 'published' : 'changed'));
     }
 
-    /** @return array<string, int|string|bool|null> */
+    /** @return array<string, mixed> */
     public function data(): array
     {
         return ['id' => $this->id, 'title' => $this->title, 'slug' => $this->slug, 'excerpt' => $this->excerpt, 'cover' => $this->cover,
             'version' => $this->version, 'published_version' => $this->publishedVersion, 'archived' => $this->archived,
-            'status' => $this->status(), 'updated_at' => $this->updatedAt, 'actor' => $this->actor, 'action' => $this->action];
+            'status' => $this->status(), 'updated_at' => $this->updatedAt, 'actor' => $this->actor, 'action' => $this->action, 'type' => $this->type, 'locale' => $this->locale];
     }
 }

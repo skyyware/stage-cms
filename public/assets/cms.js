@@ -17,8 +17,9 @@ if (editor) {
   });
   const dirty = () => editor.dataset.unsaved === 'true' || fields.some((field, index) => field.value !== initial[index]);
   const update = () => {
-    const words = body.value.trim() ? body.value.trim().split(/\s+/u).length : 0;
-    count.textContent = words + (words === 1 ? ' word' : ' words') + ' · ' + Math.max(1, Math.ceil(words / 220)) + ' min read';
+    const text = [...editor.querySelectorAll('.writing-sheet input, .writing-sheet textarea')].map(field => field.value).join(' ');
+    const words = text.trim() ? text.trim().split(/\s+/u).length : 0;
+    count.textContent = words + (words === 1 ? ' word' : ' words') + (body.closest('[hidden]') ? '' : ' · ' + Math.max(1, Math.ceil(words / 220)) + ' min read');
     const changed = dirty();
     state.textContent = changed ? 'Unsaved changes' : 'No unsaved changes';
     state.classList.toggle('unsaved', changed);

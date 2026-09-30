@@ -18,7 +18,7 @@ final readonly class Archive
     private const array COLUMNS = [
         'media' => ['id', 'name', 'mime', 'bytes', 'width', 'height', 'alt', 'sha256', 'created_at'],
         'pages' => ['id', 'slug', 'version', 'published_version', 'published_slug', 'archived', 'created_at'],
-        'revisions' => ['page_id', 'version', 'title', 'slug', 'excerpt', 'body', 'cover', 'action', 'actor', 'created_at'],
+        'revisions' => ['page_id', 'version', 'title', 'slug', 'excerpt', 'body', 'cover', 'type', 'locale', 'fields', 'action', 'actor', 'created_at'],
         'revision_media' => ['page_id', 'version', 'media_id'],
     ];
 
@@ -42,7 +42,7 @@ final readonly class Archive
                     foreach (self::COLUMNS as $table => $columns) {
                         $tables[$table] = $this->cms->db->all('SELECT ' . implode(', ', $columns) . ' FROM ' . $table);
                     }
-                    $json = json_encode(['format' => 'stage-cms/1', 'settings' => $this->cms->settings->get(), 'tables' => $tables],
+                    $json = json_encode(['format' => 'stage-cms/2', 'settings' => $this->cms->settings->get(), 'tables' => $tables],
                         JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
                     $total = strlen($json);
                     if ($total > self::MAX_BYTES) {
@@ -108,12 +108,13 @@ final readonly class Archive
                 throw new Failure(422, 'invalid_archive', 'The archive has no content.json.');
             }
             $data = Input::object(json_decode($json, true, 64, JSON_THROW_ON_ERROR));
-            if (($data['format'] ?? null) !== 'stage-cms/1') {
+            if (!in_array($data['format'] ?? null, ['stage-cms/1', 'stage-cms/2'], true)) {
                 throw new Failure(422, 'invalid_archive', 'This export format is not supported.');
             }
             $tables = Input::object($data['tables'] ?? null);
             $settings = Input::object($data['settings'] ?? null);
-            $this->cms->db->transaction(function () use ($caller, $zip, $tables, $settings, &$written): void {
+            $legacy = $data['format'] === 'stage-cms/1';
+            $this->cms->db->transaction(function () use ($caller, $zip, $tables, $settings, $legacy, &$written): void {
                 if ($this->cms->db->one('SELECT id FROM pages LIMIT 1') !== null || $this->cms->db->one('SELECT id FROM media LIMIT 1') !== null) {
                     throw new Failure(409, 'not_empty', 'Restore requires an empty publication. Existing content will not be overwritten.');
                 }
@@ -124,6 +125,9 @@ final readonly class Archive
                     }
                     foreach ($rows as $value) {
                         $row = Input::object($value);
+                        if ($table === 'revisions' && $legacy) {
+                            $row += ['type' => 'page', 'locale' => 'en', 'fields' => '{}'];
+                        }
                         if (array_diff($columns, array_keys($row)) !== [] || array_diff(array_keys($row), $columns) !== []) {
                             throw new Failure(422, 'invalid_archive', 'Unexpected export columns.');
                         }
@@ -136,7 +140,7 @@ final readonly class Archive
                             $parameters[$column] = $item;
                         }
                         if ($table === 'revisions') {
-                            Draft::fromInput($row);
+                            Draft::fromRow($row);
                         }
                         if ($table === 'media') {
                             $asset = Asset::fromRow($row);
@@ -159,7 +163,7 @@ final readonly class Archive
                 if ($this->cms->db->one('SELECT p.id FROM pages p LEFT JOIN revisions r ON r.page_id = p.id AND r.version = p.version LEFT JOIN revisions live ON live.page_id = p.id AND live.version = p.published_version WHERE r.page_id IS NULL OR p.slug != r.slug OR (p.published_version IS NOT NULL AND (live.page_id IS NULL OR p.published_slug IS NULL OR p.published_slug != live.slug)) OR (p.published_version IS NULL AND p.published_slug IS NOT NULL) OR (p.archived = 1 AND p.published_version IS NOT NULL) LIMIT 1') !== null) {
                     throw new Failure(422, 'invalid_archive', 'The page revisions in this archive are inconsistent.');
                 }
-                $this->cms->settings->save($caller, Input::text($settings, 'title'), Input::text($settings, 'description'));
+                $this->cms->settings->save($caller, Input::text($settings, 'title'), Input::text($settings, 'description'), Input::text($settings, 'theme', ''));
             });
         } catch (\Throwable $error) {
             foreach ($written as $file) {

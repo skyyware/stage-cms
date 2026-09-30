@@ -28,7 +28,7 @@ network share or several servers writing separate copies.
 Install a reviewed release:
 
 ```sh
-git clone --branch v0.3.0 https://github.com/skyyware/stage-cms.git
+git clone --branch v0.4.0 git@github.com:skyyware/stage-cms.git
 cd stage-cms
 composer install --no-dev --no-interaction --prefer-dist --no-plugins
 ```
@@ -39,7 +39,7 @@ The PHP entrypoint also applies this mask. Keep `display_errors=Off`, upload
 limit 5M, POST limit 8M, and an appropriate private error log.
 
 Configure the server so only `public/` is reachable. Route application requests
-to `public/index.php`; only the three files in `public/assets/` are static.
+to `public/index.php`; only the packaged files in `public/assets/` are static.
 Never execute uploaded files. Forward the Authorization header to PHP for
 the agent API. Preserve the real connecting address for login rate limiting;
 do not trust a client-supplied forwarding header.
@@ -52,6 +52,9 @@ client_max_body_size 8m;
 location = /assets/cms.css { try_files $uri =404; }
 location = /assets/cms.js { try_files $uri =404; }
 location = /assets/mark.svg { try_files $uri =404; }
+location = /assets/D-DIN.otf { try_files $uri =404; }
+location = /assets/D-DIN-Bold.otf { try_files $uri =404; }
+location = /assets/D-DIN-OFL.txt { try_files $uri =404; }
 location = /index.php {
     include fastcgi_params;
     fastcgi_param SCRIPT_FILENAME $document_root/index.php;
@@ -114,8 +117,19 @@ and supply a secret through standard input, never a command-line argument.
 
 Read the changelog, take and test a backup, install a tagged release, and run
 the checks in a development environment first. The application checks database
-schema version during startup and refuses an unknown newer schema. Version 0.1
-creates schema 1; future migrations must document compatibility and recovery.
+schema version during startup and refuses an unknown newer schema.
+
+Version 0.4 migrates schema 1 to schema 2 on first startup. It retains existing
+pages and publication pointers, adds type `page`, locale `en`, and empty named
+fields to every revision, and leaves the default theme selected. Back up before
+that first request. Version 0.3 cannot open schema 2: rollback requires stopping
+writers and restoring the pre-upgrade data directory together with the old code.
+
+New exports use `stage-cms/2` and include types, locales, fields, and theme IDs.
+Version 0.4 accepts both format 1 and format 2 exports. Reinstall the application's
+page type and theme definitions before editing or rendering restored content;
+archives preserve data and do not contain executable themes. Downgrading a
+format 2 archive to an earlier release is unsupported.
 
 Public source availability is separate from production deployment. No
 production domain or hosted CMS service is bundled with this repository.

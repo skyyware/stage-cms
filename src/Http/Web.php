@@ -13,6 +13,7 @@ use StageCms\Infrastructure\Archive;
 use StageCms\Input;
 use StageCms\Presentation\View;
 use StageCms\Presentation\Theme;
+use StageCms\Presentation\Themes;
 
 final readonly class Web
 {
@@ -67,8 +68,15 @@ final readonly class Web
         if ($request->method === 'POST') {
             $values = $this->context->form();
             try {
-                $draft = Draft::fromInput($values);
                 $intent = Input::text($values, 'intent', 'save');
+                if ($intent === 'type') {
+                    $this->cms->types->get(Input::text($values, 'type', 'page'));
+                    return $this->shell($page->title ?? 'New page', 'pages', $this->view->editor($page, $values, [], $this->session, true));
+                }
+                $definition = $this->cms->types->get(Input::text($values, 'type', 'page'));
+                $keys = array_fill_keys(array_map(fn ($field) => $field->key, $definition->fields), true);
+                $values['fields'] = array_filter(Input::object($values['fields'] ?? []), fn ($value, $key) => $value !== '' || isset($keys[$key]), ARRAY_FILTER_USE_BOTH);
+                $draft = Draft::fromInput($values);
                 $publish = $intent === 'publish';
                 $saved = $page === null ? $this->cms->pages->create($this->session->caller(), $draft, $publish)
                     : $this->cms->pages->save($this->session->caller(), $id, $draft, Input::integer($values['expected_version'] ?? null), $publish);
@@ -130,7 +138,7 @@ final readonly class Web
         $page = $this->cms->pages->get($this->session->caller(), $request->parameters['id']);
         if ($request->method === 'POST') {
             $input = $this->context->form();
-            $draft = new Draft($page->title, $page->slug, $page->excerpt, $page->draft->body, Input::optional($input, 'cover'));
+            $draft = new Draft($page->title, $page->slug, $page->excerpt, $page->draft->body, Input::optional($input, 'cover'), $page->type, $page->locale, $page->draft->fields);
             $this->cms->pages->save($this->session->caller(), $page->id, $draft, Input::integer($input['expected_version'] ?? null));
             return self::redirect('/admin/pages/' . $page->id . '?notice=saved');
         }
@@ -219,10 +227,14 @@ final readonly class Web
     {
         if ($request->method === 'POST') {
             $input = $this->context->form();
-            $this->cms->settings->save($this->session->caller(), Input::text($input, 'title'), Input::text($input, 'description'));
+            $theme = Input::text($input, 'theme', $this->cms->settings->get()['theme']);
+            if ($this->theme instanceof Themes) {
+                $this->theme->get($theme);
+            }
+            $this->cms->settings->save($this->session->caller(), Input::text($input, 'title'), Input::text($input, 'description'), $theme);
             return self::redirect('/admin/settings?notice=updated');
         }
-        return $this->shell('Settings', 'settings', $this->view->settings($this->cms->settings->get(), $this->session));
+        return $this->shell('Settings', 'settings', $this->view->settings($this->cms->settings->get(), $this->session, $this->theme instanceof Themes ? $this->theme : null));
     }
 
     public function export(Request $request): Response
@@ -240,8 +252,8 @@ final readonly class Web
     private function shell(string $title, string $section, string $body, string $error = '', int $status = 200): Response
     {
         $notice = match (Input::text($this->context->query(), 'notice', '')) {
-            'saved' => 'Draft saved. Your words are safe here.',
-            'published' => 'Published. Your page is ready to read.',
+            'saved' => 'Draft saved.',
+            'published' => 'Page published.',
             'unpublish' => 'Page unpublished. It is now a private draft.',
             'archive' => 'Page archived. Recover it whenever you need it.',
             'recover', 'restore' => 'Restored as a draft.',

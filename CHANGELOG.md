@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.0 — 2026-09-30
+
+Applications can register page types with named text fields, supported languages,
+and installed themes. The editor exposes these choices; agent discovery is
+available at `/api/types`. Publication and recovery preserve the complete typed
+revision. Type changes retain incompatible text until explicitly cleared.
+
+The workspace uses SKYYWARE colors, bundled D-DIN fonts, and a compact S mark.
+Inputs use a visible border and inset bar for focus, with no outlines.
+
+Schema 1 migrates to schema 2. Existing Markdown pages remain readable and
+published. Exports use format 2; restore also accepts format 1. Back up before
+upgrading: rollback to 0.3 needs the old code and pre-upgrade data together.
+Source repositories remain private during development; the license remains MIT.
+
 ## 0.3.0 — 2026-09-28
 
 The editor opens a searchable visual cover picker after saving the draft.

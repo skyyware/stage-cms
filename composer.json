@@ -48,5 +48,11 @@
   "config": {
     "sort-packages": true,
     "allow-plugins": false
-  }
+  },
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "git@github.com:skyyware/stage.git"
+    }
+  ]
 }

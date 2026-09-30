@@ -31,25 +31,37 @@ final readonly class Database
 
     public function migrate(): void
     {
-        $statement = $this->pdo->query('PRAGMA user_version');
-        if ($statement === false) {
-            throw new \RuntimeException('Cannot read the database version.');
+        $version = $this->schemaVersion();
+        if ($version === 2) {
+            return;
         }
-        $version = $statement->fetchColumn();
         if ($version === 1) {
+            $this->transaction(function (): void {
+                if ($this->schemaVersion() !== 1) {
+                    return;
+                }
+                $this->pdo->exec("ALTER TABLE revisions ADD COLUMN type TEXT NOT NULL DEFAULT 'page';
+                    ALTER TABLE revisions ADD COLUMN locale TEXT NOT NULL DEFAULT 'en';
+                    ALTER TABLE revisions ADD COLUMN fields TEXT NOT NULL DEFAULT '{}';
+                    ALTER TABLE settings ADD COLUMN theme TEXT NOT NULL DEFAULT '';
+                    PRAGMA user_version = 2;");
+            });
             return;
         }
         if ($version !== 0) {
             throw new \RuntimeException('This database requires a newer Stage CMS version.');
         }
         $this->transaction(function (): void {
+            if ($this->schemaVersion() !== 0) {
+                return;
+            }
             $this->pdo->exec(<<<SQL
                 CREATE TABLE owner (id INTEGER PRIMARY KEY CHECK (id = 1), name TEXT NOT NULL, email TEXT NOT NULL, password_hash TEXT NOT NULL);
                 CREATE TABLE sessions (hash TEXT PRIMARY KEY, csrf TEXT NOT NULL, authenticated INTEGER NOT NULL DEFAULT 0, expires INTEGER NOT NULL);
                 CREATE TABLE login_attempts (key TEXT PRIMARY KEY, attempts INTEGER NOT NULL, expires INTEGER NOT NULL);
                 CREATE TABLE tokens (id TEXT PRIMARY KEY, hash TEXT NOT NULL UNIQUE, name TEXT NOT NULL, scopes TEXT NOT NULL, expires INTEGER NOT NULL, created_at TEXT NOT NULL, last_used TEXT, revoked_at TEXT);
                 CREATE TABLE settings (id INTEGER PRIMARY KEY CHECK (id = 1), title TEXT NOT NULL, description TEXT NOT NULL);
-                INSERT INTO settings VALUES (1, 'Your publication', 'A place for ideas worth sharing.');
+                INSERT INTO settings VALUES (1, 'Your publication', '');
                 CREATE TABLE media (id TEXT PRIMARY KEY, name TEXT NOT NULL, mime TEXT NOT NULL, bytes INTEGER NOT NULL, width INTEGER NOT NULL, height INTEGER NOT NULL, alt TEXT NOT NULL, sha256 TEXT NOT NULL, created_at TEXT NOT NULL);
                 CREATE TABLE pages (id TEXT PRIMARY KEY, slug TEXT NOT NULL UNIQUE, version INTEGER NOT NULL, published_version INTEGER, published_slug TEXT UNIQUE, archived INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
                 CREATE TABLE revisions (page_id TEXT NOT NULL REFERENCES pages(id), version INTEGER NOT NULL, title TEXT NOT NULL, slug TEXT NOT NULL, excerpt TEXT NOT NULL, body TEXT NOT NULL, cover TEXT REFERENCES media(id), action TEXT NOT NULL, actor TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(page_id, version));
@@ -58,6 +70,17 @@ final readonly class Database
                 PRAGMA user_version = 1;
             SQL);
         });
+        $this->migrate();
+    }
+
+    private function schemaVersion(): int
+    {
+        $statement = $this->pdo->query('PRAGMA user_version');
+        $version = $statement === false ? false : $statement->fetchColumn();
+        if (!is_int($version)) {
+            throw new \RuntimeException('Cannot read the database version.');
+        }
+        return $version;
     }
 
     /**

@@ -1,27 +1,31 @@
 # Stage CMS
 
-A considered place to write, publish, and work with agents.
+Write, preview, and publish pages. Give agents only the access they need.
 
 Stage CMS is an MIT-licensed PHP application built on the
 [Stage framework](https://github.com/skyyware/stage). People use the workspace.
 Agents use the API. Both work with the same content operations, permissions,
 and version history.
 
-**Version 0.3 is an early, working release for one publication and one owner.**
+**Version 0.4 is an early, working release for one publication and one owner.**
 It includes pages, Markdown editing, private previews, publication, revision
-restoration, an image library, agent connections, and portable export/restore.
+restoration, named content fields, page types, languages, theme selection, an
+image library, agent connections, and portable export/restore.
 The API and database format may change before 1.0.
-
-![The Stage CMS writing workspace](docs/editor.jpg)
 
 ## Start in five minutes
 
 Requires PHP 8.4 or 8.5, Composer 2, and the Fileinfo, GD with JPEG/PNG/WebP,
 Mbstring, PDO SQLite, and Zip extensions.
 
+The repository is private during development. Installation currently requires
+GitHub access to `skyyware/stage-cms` and `skyyware/stage`. The code remains
+MIT licensed; public package distribution will resume with a public release.
+
 ```sh
-composer create-project skyyware/stage-cms my-site "^0.3"
+git clone --branch v0.4.0 git@github.com:skyyware/stage-cms.git my-site
 cd my-site
+composer install
 php bin/cms setup --name="Your name" --email="you@example.com"
 composer serve
 ```
@@ -37,7 +41,7 @@ Read the [deployment guide](docs/operations.md) before using a public server.
 
 ## A small, complete workflow
 
-1. Create a page. Write a title, choose its address, and add Markdown content.
+1. Create a page. Choose its type and language. Write in its named fields or Markdown.
 2. Save a private draft. Preview opens the latest saved version.
 3. Publish when ready. Editing again keeps the previous publication live.
 4. Use history to restore an earlier version as a new draft.
@@ -48,7 +52,7 @@ saves your draft and opens a searchable cover picker. You can also insert an
 image address in Markdown. Images remain private until a published page
 references them. Deleting an image used by any revision is refused.
 
-Settings contains the publication name, description, and a ZIP export of
+Settings contains the publication name, description, installed theme, and a ZIP export of
 content, revisions, and images. Exports exclude passwords and agent tokens.
 See [recovery](docs/operations.md#recovery).
 
@@ -88,7 +92,7 @@ The intent is to make the whole application understandable to one person.
 
 ## Develop and contribute
 
-Clone `https://github.com/skyyware/stage-cms.git` and run `composer install`
+Clone `git@github.com:skyyware/stage-cms.git` and run `composer install`
 when working on the application source.
 
 ```sh
@@ -114,13 +118,15 @@ requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and
 ## Current limits
 
 One owner and one site; no team roles, comments, scheduled publication,
-custom content types, plugins, or real-time collaboration. Pages have one
+a plugin marketplace, or real-time collaboration. Applications register their
+own page types and themes in code. Types provide text fields, not arbitrary
+executable templates or a visual layout builder. Pages have one
 lowercase URL segment. Markdown accepts no raw HTML. External images are
 blocked by the content security policy; upload them to the library.
 
 Pages, history, and images use 50-item pagination. Lists read summaries; complete
 content loads when opened or explicitly requested through the API. Images are limited to
-5 MiB and 16 megapixels; bodies to 200 KB. Portable exports are limited to
+5 MiB and 16 megapixels; bodies to 200 KB and named fields to 200 KB of encoded JSON. Portable exports are limited to
 128 MiB uncompressed. Large installations need their own measured capacity and
 backup plan. No horizontal write scaling or independent security audit is
 claimed for this release.
