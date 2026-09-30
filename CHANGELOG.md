@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.1 — 2026-09-30
+
+Private SKYYWARE dependencies prefer authenticated Git source installs. This
+avoids anonymous archive downloads after the repositories became private.
+CI still requires read access to its private dependencies.
+
 ## 0.4.0 — 2026-09-30
 
 Applications can register page types with named text fields, supported languages,

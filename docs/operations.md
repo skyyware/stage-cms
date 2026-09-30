@@ -28,9 +28,9 @@ network share or several servers writing separate copies.
 Install a reviewed release:
 
 ```sh
-git clone --branch v0.4.0 git@github.com:skyyware/stage-cms.git
+git clone --branch v0.4.1 git@github.com:skyyware/stage-cms.git
 cd stage-cms
-composer install --no-dev --no-interaction --prefer-dist --no-plugins
+composer install --no-dev --no-interaction --no-plugins
 ```
 
 Use the release's lockfile. Give the runtime user read access to code and write

@@ -47,7 +47,11 @@
   },
   "config": {
     "sort-packages": true,
-    "allow-plugins": false
+    "allow-plugins": false,
+    "preferred-install": {
+      "skyyware/*": "source",
+      "*": "dist"
+    }
   },
   "repositories": [
     {

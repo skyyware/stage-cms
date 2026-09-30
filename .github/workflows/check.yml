@@ -16,5 +16,5 @@ jobs:
           extensions: fileinfo, gd, mbstring, pdo_sqlite, zip
           tools: composer:v2
           coverage: none
-      - run: composer install --no-interaction --no-plugins --prefer-dist
+      - run: composer install --no-interaction --no-plugins
       - run: composer check

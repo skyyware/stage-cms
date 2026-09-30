@@ -21,9 +21,10 @@ Mbstring, PDO SQLite, and Zip extensions.
 The repository is private during development. Installation currently requires
 GitHub access to `skyyware/stage-cms` and `skyyware/stage`. The code remains
 MIT licensed; public package distribution will resume with a public release.
+Private SKYYWARE dependencies install through authenticated Git over SSH.
 
 ```sh
-git clone --branch v0.4.0 git@github.com:skyyware/stage-cms.git my-site
+git clone --branch v0.4.1 git@github.com:skyyware/stage-cms.git my-site
 cd my-site
 composer install
 php bin/cms setup --name="Your name" --email="you@example.com"
