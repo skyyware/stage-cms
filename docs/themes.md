@@ -6,19 +6,15 @@ its content fields; a theme renders that content.
 
 ## Install in an application
 
-While the repositories are private, add both VCS repositories to the consuming
-application's `composer.json`. Composer does not inherit dependency repositories.
-Use an account with access; keep credentials outside the repository.
+Install the public package in your existing Composer project:
 
-```json
-{
-  "repositories": [
-    {"type": "vcs", "url": "git@github.com:skyyware/stage-cms.git"},
-    {"type": "vcs", "url": "git@github.com:skyyware/stage.git"}
-  ],
-  "require": {"skyyware/stage-cms": "^0.5.0"}
-}
+```sh
+composer require skyyware/stage-cms:^0.5.1
 ```
+
+No VCS override or private repository access is required. Commit your
+application's lockfile. When upgrading from 0.4, follow the
+[schema migration and recovery guide](operations.md#updates).
 
 ## Define content
 

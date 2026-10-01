@@ -28,9 +28,8 @@ network share or several servers writing separate copies.
 Install a reviewed release:
 
 ```sh
-git clone --branch v0.5.0 git@github.com:skyyware/stage-cms.git
+composer create-project skyyware/stage-cms stage-cms "0.5.1" --no-dev --no-interaction --no-plugins
 cd stage-cms
-composer install --no-dev --no-interaction --no-plugins
 ```
 
 Use the release's lockfile. Give the runtime user read access to code and write
@@ -118,6 +117,12 @@ and supply a secret through standard input, never a command-line argument.
 Read the changelog, take and test a backup, install a tagged release, and run
 the checks in a development environment first. The application checks database
 schema version during startup and refuses an unknown newer schema.
+
+Version 0.5.1 changes package distribution and documentation. Its API, schema 3,
+and export format 3 match 0.5.0. Existing Composer applications can run
+`composer require skyyware/stage-cms:^0.5.1` and review the resulting lockfile.
+Remove obsolete private Stage VCS overrides and source-preference settings;
+retain repository configuration needed by other packages.
 
 Version 0.5 migrates schemas 1 and 2 to schema 3 on first startup. Existing
 content, revision numbers, publication pointers, and settings are preserved.

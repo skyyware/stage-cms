@@ -1,6 +1,12 @@
 {
   "name": "skyyware/stage-cms",
   "description": "A CMS for people and agents, built on Stage.",
+  "homepage": "https://github.com/skyyware/stage-cms",
+  "support": {
+    "issues": "https://github.com/skyyware/stage-cms/issues",
+    "source": "https://github.com/skyyware/stage-cms",
+    "docs": "https://github.com/skyyware/stage-cms/blob/main/README.md"
+  },
   "type": "project",
   "license": "MIT",
   "keywords": [
@@ -47,16 +53,6 @@
   },
   "config": {
     "sort-packages": true,
-    "allow-plugins": false,
-    "preferred-install": {
-      "skyyware/*": "source",
-      "*": "dist"
-    }
-  },
-  "repositories": [
-    {
-      "type": "vcs",
-      "url": "git@github.com:skyyware/stage.git"
-    }
-  ]
+    "allow-plugins": false
+  }
 }

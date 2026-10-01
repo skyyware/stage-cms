@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.1 — 2026-10-01
+
+Install the standalone CMS or embed it in an application through public
+Packagist packages. Private VCS overrides and source-preference settings are
+removed from the package. Installation, contribution, security, and release
+guides describe the current 0.5 workflow for people and agents.
+
+No API, database schema, export format, or editing behavior changes from 0.5.0.
+Upgrades from 0.4 still require the schema 3 migration and backup procedure.
+
 ## 0.5.0 — 2026-09-30
 
 Pages have stable identities, linked translations, and optional application-owned

@@ -25,3 +25,6 @@ work, and never include runtime data or secrets in a patch.
 Reports, documentation fixes, accessibility work, and small improvements are
 welcome. Be considerate and specific in reviews. By contributing, you agree
 that your changes are available under this project's MIT license.
+
+Run validation locally; repository automation is disabled. Maintainers follow
+[RELEASING.md](RELEASING.md) for package and application-consumer checks.

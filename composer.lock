@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "86ab2a72e3e304f60eadd421610e40e9",
+    "content-hash": "c23348194440039bf3fa4037b99c7036",
     "packages": [
         {
             "name": "dflydev/dot-access-data",
@@ -483,7 +483,7 @@
             "version": "v0.1.1",
             "source": {
                 "type": "git",
-                "url": "git@github.com:skyyware/stage.git",
+                "url": "https://github.com/skyyware/stage.git",
                 "reference": "f2a535f202416363aab2ee7bf544671ae24f85ff"
             },
             "dist": {

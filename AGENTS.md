@@ -15,3 +15,7 @@ hostile content, stale revisions, and recovery alongside successful calls.
 Use PHP types and explicit dependencies. Add no narrative source comments or
 TODO placeholders. PHPDoc consumed by PHPStan and required legal notices are
 allowed. Public docs explain behavior, installation, and limits.
+
+This is a public MIT package. CONTRIBUTING.md defines the contribution checks;
+RELEASING.md requires an immutable tag, a GitHub Release, Packagist availability,
+and fresh standalone and embedded consumers. Keep repository automation disabled.

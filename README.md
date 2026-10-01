@@ -7,26 +7,25 @@ Stage CMS is an MIT-licensed PHP application built on the
 Agents use the API. Both work with the same content operations, permissions,
 and version history.
 
-**Version 0.4 is an early, working release for one publication and one owner.**
+Version 0.5 is an early, working release for one publication and one owner.
 It includes pages, Markdown editing, private previews, publication, revision
 restoration, named content fields, page types, languages, theme selection, an
-image library, agent connections, and portable export/restore.
+image library, agent connections, and portable export/restore. Pages have stable
+identities, linked translations, optional fixed public paths, and publication rules.
 The API and database format may change before 1.0.
 
-## Start in five minutes
+## Start a publication
 
 Requires PHP 8.4 or 8.5, Composer 2, and the Fileinfo, GD with JPEG/PNG/WebP,
 Mbstring, PDO SQLite, and Zip extensions.
 
-The repository is private during development. Installation currently requires
-GitHub access to `skyyware/stage-cms` and `skyyware/stage`. The code remains
-MIT licensed; public package distribution will resume with a public release.
-Private SKYYWARE dependencies install through authenticated Git over SSH.
+Install the tagged application from
+[Packagist](https://packagist.org/packages/skyyware/stage-cms).
+No GitHub account, SSH identity, or custom Composer repository is required.
 
 ```sh
-git clone --branch v0.5.0 git@github.com:skyyware/stage-cms.git my-site
+composer create-project skyyware/stage-cms my-site "^0.5.1" --no-plugins
 cd my-site
-composer install
 php bin/cms setup --name="Your name" --email="you@example.com"
 composer serve
 ```
@@ -93,7 +92,7 @@ The intent is to make the whole application understandable to one person.
 
 ## Develop and contribute
 
-Clone `git@github.com:skyyware/stage-cms.git` and run `composer install`
+Clone `https://github.com/skyyware/stage-cms.git` and run `composer install`
 when working on the application source.
 
 ```sh
@@ -116,6 +115,7 @@ Bug reports, documentation fixes, accessibility improvements, and focused pull
 requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and
 [AGENTS.md](AGENTS.md). For vulnerabilities, use the private reporting route in
 [SECURITY.md](SECURITY.md).
+Maintainers follow [RELEASING.md](RELEASING.md).
 
 ## Current limits
 
@@ -136,3 +136,5 @@ claimed for this release.
 
 [MIT](LICENSE) · [Changelog](CHANGELOG.md) ·
 [Stage](https://github.com/skyyware/stage)
+
+Bundled D-DIN fonts retain their separate [SIL Open Font License](public/assets/D-DIN-OFL.txt).
