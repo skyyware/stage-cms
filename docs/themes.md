@@ -9,7 +9,7 @@ its content fields; a theme renders that content.
 Install the public package in your existing Composer project:
 
 ```sh
-composer require skyyware/stage-cms:^0.5.1
+composer require skyyware/stage-cms:^0.5.2
 ```
 
 No VCS override or private repository access is required. Commit your

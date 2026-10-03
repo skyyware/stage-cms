@@ -373,7 +373,7 @@ final class CmsTest extends TestCase
     {
         $reflection = new \ReflectionClass(\Stage\Http\Application::class);
         self::assertSame(realpath(dirname(__DIR__) . '/vendor/skyyware/stage/src/Http/Application.php'), $reflection->getFileName());
-        self::assertSame('0.1.1.0', \Composer\InstalledVersions::getVersion('skyyware/stage'));
+        self::assertSame('0.1.4.0', \Composer\InstalledVersions::getVersion('skyyware/stage'));
     }
 
     public function testCompactListsHaveExactPaginationAndExplicitFullContent(): void

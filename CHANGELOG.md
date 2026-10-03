@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.5.2 — 2026-10-03
+
+Render Markdown tables in pages, previews, and revision views. Raw HTML stays
+stripped and unsafe links remain blocked, including inside table cells.
+No new dependency, API, schema, or export-format change. The standalone lockfile
+now uses Stage 0.1.4. Existing pipe-table text
+now renders as a table; check such pages when upgrading from 0.5.1.
+
 ## 0.5.1 — 2026-10-01
 
 Install the standalone CMS or embed it in an application through public

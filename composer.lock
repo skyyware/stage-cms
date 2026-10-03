@@ -480,16 +480,16 @@
         },
         {
             "name": "skyyware/stage",
-            "version": "v0.1.1",
+            "version": "v0.1.4",
             "source": {
                 "type": "git",
                 "url": "https://github.com/skyyware/stage.git",
-                "reference": "f2a535f202416363aab2ee7bf544671ae24f85ff"
+                "reference": "6ab68afad4960082b71575d19e57f7a9a5dbc39b"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/skyyware/stage/zipball/f2a535f202416363aab2ee7bf544671ae24f85ff",
-                "reference": "f2a535f202416363aab2ee7bf544671ae24f85ff",
+                "url": "https://api.github.com/repos/skyyware/stage/zipball/6ab68afad4960082b71575d19e57f7a9a5dbc39b",
+                "reference": "6ab68afad4960082b71575d19e57f7a9a5dbc39b",
                 "shasum": ""
             },
             "require": {
@@ -512,7 +512,7 @@
                 "MIT"
             ],
             "description": "A PHP framework for people and coding agents, with explicit application boundaries.",
-            "homepage": "https://stage.dev",
+            "homepage": "https://github.com/skyyware/stage",
             "keywords": [
                 "agents",
                 "framework",
@@ -520,11 +520,11 @@
                 "php"
             ],
             "support": {
-                "docs": "https://stage.dev/docs",
+                "docs": "https://github.com/skyyware/stage/blob/main/README.md",
                 "issues": "https://github.com/skyyware/stage/issues",
                 "source": "https://github.com/skyyware/stage"
             },
-            "time": "2026-09-28T19:24:03+00:00"
+            "time": "2026-10-03T13:48:33+00:00"
         },
         {
             "name": "symfony/deprecation-contracts",

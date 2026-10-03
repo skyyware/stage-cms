@@ -1157,6 +1157,24 @@ legend{
   border-top:1px solid var(--line);
   margin:3em 0
 }
+.prose .table-scroll{
+  max-width:100%;
+  overflow-x:auto;
+  margin:28px 0
+}
+.prose table{
+  width:100%;
+  border-collapse:collapse;
+  font-variant-numeric:tabular-nums
+}
+.prose th,.prose td{
+  padding:12px 16px;
+  border-bottom:1px solid var(--line);
+  vertical-align:top
+}
+.prose th:not([align]),.prose td:not([align]){
+  text-align:left
+}
 .login-page{
   min-height:100vh
 }

@@ -24,7 +24,7 @@ Install the tagged application from
 No GitHub account, SSH identity, or custom Composer repository is required.
 
 ```sh
-composer create-project skyyware/stage-cms my-site "^0.5.1" --no-plugins
+composer create-project skyyware/stage-cms my-site "^0.5.2" --no-plugins
 cd my-site
 php bin/cms setup --name="Your name" --email="you@example.com"
 composer serve
