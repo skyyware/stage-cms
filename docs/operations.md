@@ -3,8 +3,8 @@
 ## Local development
 
 Install PHP 8.4/8.5 and Composer with the extensions listed in `composer.json`.
-`composer install`, `php bin/cms setup`, and `composer serve` are the supported
-local path. The built-in PHP server is a development server.
+Run `composer install`, `php bin/cms setup`, and `composer serve` in the checkout.
+Use the built-in PHP server for local development only.
 
 Runtime defaults to `.runtime/data/`, outside `public/` and ignored by Git.
 Do not store databases or uploads in a synced source directory.
@@ -28,7 +28,7 @@ network share or several servers writing separate copies.
 Install a reviewed release:
 
 ```sh
-composer create-project skyyware/stage-cms stage-cms "0.5.1" --no-dev --no-interaction --no-plugins
+composer create-project skyyware/stage-cms stage-cms "0.5.3" --no-dev --no-interaction --no-plugins
 cd stage-cms
 ```
 
@@ -118,9 +118,11 @@ Read the changelog, take and test a backup, install a tagged release, and run
 the checks in a development environment first. The application checks database
 schema version during startup and refuses an unknown newer schema.
 
-Version 0.5.1 changes package distribution and documentation. Its API, schema 3,
-and export format 3 match 0.5.0. Existing Composer applications can run
-`composer require skyyware/stage-cms:^0.5.1` and review the resulting lockfile.
+Version 0.5.3 clarifies editor instructions, errors, and documentation. Its API,
+schema 3, and export format 3 match 0.5.0. Version 0.5.2 added Markdown tables;
+check existing pipe-table content when upgrading from 0.5.1 or earlier.
+Existing Composer applications can run
+`composer require skyyware/stage-cms:^0.5.3` and review the resulting lockfile.
 Remove obsolete private Stage VCS overrides and source-preference settings;
 retain repository configuration needed by other packages.
 

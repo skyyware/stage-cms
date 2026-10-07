@@ -41,10 +41,10 @@ final readonly class Library
     {
         $caller->require('media:write');
         if (strlen($bytes) > self::MAX_BYTES || $bytes === '') {
-            throw new Failure(413, 'image_too_large', 'Choose an image no larger than 5 MB.');
+            throw new Failure(413, 'image_too_large', 'Choose a nonempty image no larger than 5 MiB.');
         }
         if (mb_strlen($alt) > 300) {
-            throw new Failure(422, 'invalid_alt', 'Keep the image description under 300 characters.');
+            throw new Failure(422, 'invalid_alt', 'Use at most 300 characters for the image description.');
         }
         $mime = (new finfo(FILEINFO_MIME_TYPE))->buffer($bytes);
         if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true)) {
@@ -75,7 +75,7 @@ final readonly class Library
                 ob_end_clean();
             }
             if (!$encoded || $clean === false || strlen($clean) > self::MAX_BYTES) {
-                throw new Failure(422, 'invalid_image', 'The decoded image could not be stored within 5 MB.');
+                throw new Failure(422, 'invalid_image', 'The image exceeds 5 MiB after processing or could not be encoded.');
             }
         } finally {
             restore_error_handler();
@@ -136,7 +136,7 @@ final readonly class Library
         $caller->require('media:write');
         $this->get($id);
         if (mb_strlen($alt) > 300) {
-            throw new Failure(422, 'invalid_alt', 'Keep the image description under 300 characters.');
+            throw new Failure(422, 'invalid_alt', 'Use at most 300 characters for the image description.');
         }
         $this->db->execute('UPDATE media SET alt = :alt WHERE id = :id', ['id' => $id, 'alt' => trim($alt)]);
     }

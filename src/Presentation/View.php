@@ -89,7 +89,7 @@ final readonly class View
                 . self::badge($page) . '<time datetime="' . self::e($page->updatedAt) . '">' . self::date($page->updatedAt)
                 . '</time><span class="row-arrow" aria-hidden="true">↗</span></a>';
         }
-        return $body . '</div><p class="collection-note">' . count($pages) . ' ' . (count($pages) === 1 ? 'page' : 'pages') . ' in this view · Every saved change has a history.</p>';
+        return $body . '</div><p class="collection-note">' . count($pages) . ' ' . (count($pages) === 1 ? 'page' : 'pages') . ' in this view · Saved changes appear in version history.</p>';
     }
 
     public static function badge(PageSummary $page): string
@@ -151,7 +151,7 @@ final readonly class View
         }
         $typeControl = '<label for="page-type">Page type</label><div class="type-control"><select id="page-type" name="type">' . $typeOptions
             . '</select><button class="button" name="intent" value="type" formnovalidate>Apply type</button></div>'
-            . '<p class="field-hint">Choose the fields and layout, then apply.</p>';
+            . '<p class="field-hint">Choose a page type, then apply it to show its fields.</p>';
         if ($page?->binding !== null) {
             $typeControl = '<span class="field-label">Page type</span><p class="fixed-detail">' . self::e($this->types->all[$page->type]->label ?? $page->type)
                 . '</p><input type="hidden" name="type" value="' . self::e($page->type) . '"><p class="field-hint">Assigned by this website.</p>';
@@ -337,7 +337,7 @@ final readonly class View
         $body = $this->heading('CONTENT', 'Media', 'Upload and describe images for your pages.');
         $body .= <<<HTML
             <form class="upload-form panel" method="post" action="/admin/media" enctype="multipart/form-data">{$csrf}
-            <div><label for="image">Add an image</label><input id="image" type="file" name="image" accept="image/jpeg,image/png,image/webp" required><p class="field-hint">JPEG, PNG, or WebP · Up to 5 MB and 16 megapixels</p></div>
+            <div><label for="image">Add an image</label><input id="image" type="file" name="image" accept="image/jpeg,image/png,image/webp" required><p class="field-hint">JPEG, PNG, or WebP · Up to 5 MiB and 16 megapixels</p></div>
             <div><label for="upload-alt">Describe it <span>for readers using assistive technology</span></label><input id="upload-alt" name="alt" maxlength="300" placeholder="What does the image show?"></div><button class="button primary">Upload image</button></form>
             HTML;
         $body .= self::mediaSearch('/admin/media', $search);
@@ -349,7 +349,7 @@ final readonly class View
         foreach ($assets as $asset) {
             $body .= '<article class="media-card"><a href="/media/' . $asset->id . '" target="_blank" rel="noopener"><img src="/media/' . $asset->id . '" alt="' . self::e($asset->alt)
                 . '" loading="lazy"></a><div class="media-info"><h2>' . self::e($asset->name) . '</h2><p>' . $asset->width . ' × ' . $asset->height . ' · '
-                . number_format($asset->bytes / 1024) . ' KB</p><form method="post" action="/admin/media/' . $asset->id . '">' . $csrf
+                . number_format($asset->bytes / 1024) . ' KiB</p><form method="post" action="/admin/media/' . $asset->id . '">' . $csrf
                 . '<label for="alt-' . $asset->id . '">Image description</label><input id="alt-' . $asset->id . '" name="alt" value="' . self::e($asset->alt) . '" maxlength="300"><button class="small-link">Save description</button></form>'
                 . '<div class="media-tools"><button class="link" type="button" data-copy="/media/' . $asset->id . '">Copy address</button><form method="post" action="/admin/media/' . $asset->id . '/delete">' . $csrf
                 . '<button class="link">Delete unused</button></form></div><code class="media-address">/media/' . $asset->id . '</code></div></article>';
@@ -361,9 +361,9 @@ final readonly class View
     public function agents(array $tokens, Session $session, ?string $secret = null): string
     {
         $csrf = self::csrf($session);
-        $body = $this->heading('ACCESS', 'Agents', 'Create scoped connections to the content API.');
+        $body = $this->heading('ACCESS', 'Agents', 'Choose what each agent can read and change.');
         if ($secret !== null) {
-            $body .= '<div class="token-reveal" role="status"><h2>Your connection is ready.</h2><p>Copy this token now. It is shown only once. Keep it in your agent’s secret storage.</p><code>'
+            $body .= '<div class="token-reveal" role="status"><h2>Your connection is ready.</h2><p>Copy this token now. It is shown only once. Store it as a secret in your agent configuration.</p><code>'
                 . self::e($secret) . '</code><button class="button" type="button" data-copy="' . self::e($secret) . '">Copy token</button></div>';
         }
         $body .= '<div class="agent-layout"><section class="panel"><h2>New connection</h2><form method="post" action="/admin/agents">' . $csrf
@@ -373,7 +373,7 @@ final readonly class View
             $body .= '<label class="check"><input type="checkbox" name="scopes[]" value="' . $scope . '"' . ($scope === 'content:write' ? ' checked' : '') . '>' . $label . '</label>';
         }
         $body .= '</fieldset><label for="days">Expires in</label><select id="days" name="days"><option value="30">30 days</option><option value="90" selected>90 days</option><option value="365">1 year</option></select>'
-            . '<button class="button primary">Create connection</button></form></section><aside class="agent-note"><span class="large-symbol" aria-hidden="true">✳</span><h2>Set each connection’s permissions.</h2><p>People and agents work on the same pages. Every content change is recorded. Publishing is a separate permission.</p>'
+            . '<button class="button primary">Create connection</button></form></section><aside class="agent-note"><span class="large-symbol" aria-hidden="true">✳</span><h2>Choose permissions for each connection.</h2><p>People and agents work on the same pages. Every content change is recorded. Publishing is a separate permission.</p>'
             . '<p>Agents cannot change your settings, password, or other connections.</p><a href="/api/schema" target="_blank" rel="noopener">Read the API schema ↗</a><a href="/api/guide" target="_blank" rel="noopener">Agent quick start ↗</a></aside></div>'
             . '<h2 class="section-title">Connections</h2><div class="connections">';
         if ($tokens === []) {
@@ -404,14 +404,14 @@ final readonly class View
             foreach ($themes->all as $option) {
                 $themeControl .= '<option value="' . self::e($option->id) . '"' . ($themes->selected() === $option->id ? ' selected' : '') . '>' . self::e($option->label) . '</option>';
             }
-            $themeControl .= '</select><p class="field-hint">Applies immediately to the public site and previews.</p>';
+            $themeControl .= '</select><p class="field-hint">Saving settings changes the theme on the public site and previews.</p>';
         }
         return $this->heading('SITE', 'Settings', 'Name, theme, and content export.')
             . '<div class="settings-layout"><form class="panel" method="post" action="/admin/settings">' . self::csrf($session)
             . '<label for="site-title">Site name</label><input id="site-title" name="title" value="' . self::e($settings['title']) . '" maxlength="100" required>'
             . '<label for="description">Description</label><textarea id="description" name="description" rows="4" maxlength="300">' . self::e($settings['description'])
             . '</textarea>' . $themeControl . '<button class="button primary">Save settings</button></form><aside class="panel export-panel"><h2>Export content</h2><p>Download every page, revision, and image in a portable archive. Passwords, sessions, and agent tokens are excluded.</p><form method="post" action="/admin/export">'
-            . self::csrf($session) . '<button class="button">Export content ↓</button></form><p class="field-hint">ZIP archive · JSON content + original stored images</p></aside></div>';
+            . self::csrf($session) . '<button class="button">Export content ↓</button></form><p class="field-hint">ZIP archive · JSON content and stored images</p></aside></div>';
     }
 
     public function login(Session $session, string $error = ''): string
@@ -427,12 +427,12 @@ final readonly class View
     public function help(): string
     {
         return $this->heading('DOCUMENTATION', 'Using Stage CMS', 'Editing, publishing, and working with agents.')
-            . '<div class="guide prose"><h2>From draft to publication</h2><p>Create a page, choose an address, and save. Drafts are visible only in your workspace. Preview shows the latest saved draft. Publish makes it available to everyone.</p>'
+            . '<div class="guide prose"><h2>From draft to publication</h2><p>Create a page, choose an address, and save. Only the owner and agents with read access can read drafts. Preview shows the latest saved draft. Publish makes it available to everyone.</p>'
             . '<p>Editing a published page keeps its previous version live until you publish again. Unpublish removes the public page. Archive puts it aside; recovery brings it back as a draft.</p>'
-            . '<h2>Page type, language, and theme</h2><p>In Page details, choose a type and select Apply type to load its fields. Move or clear incompatible content before saving. Choose the page’s language, then save a draft. Settings lets you choose from installed themes; this changes the public site immediately. The application defines which types, languages, themes, and public routes are available.</p>'
+            . '<h2>Page type, language, and theme</h2><p>In Page details, choose a type and select Apply type to load its fields. Move or clear incompatible content before saving. Choose the language when creating a page. Use a translation draft for another language. In Settings, select an installed theme and save to change the public site. The application defines which types, languages, themes, and public routes are available.</p>'
             . '<h2 id="writing">Writing with Markdown</h2><p>Use plain text with a few simple marks. The toolbar can insert them for you.</p>'
             . '<pre><code>## A section heading' . "\n\n" . '**Bold words** and *a little emphasis*' . "\n\n" . '[A link](https://example.com)' . "\n\n" . '- One idea' . "\n" . '- Another idea' . "\n\n" . '![Image description](/media/your-image-id)</code></pre>'
-            . '<p>Raw HTML is removed. Images from your library are private until a published page refers to their address or uses them as a cover. A publication cannot undo downloads already made by readers.</p>'
+            . '<p>Raw HTML is removed. Images from your library are private until a published page refers to their address or uses them as a cover. Unpublishing cannot remove copies readers have already downloaded.</p>'
             . '<h2>Work without overwriting each other</h2><p>Each saved change has a revision number. If a person or agent saves first, your next save stops and keeps your submitted text on screen. Open the latest version in another tab, compare, then transfer your changes.</p>'
             . '<h2>Invite an agent</h2><p>Create a connection, choose permissions, and copy its token once. Start with draft access. Add publication access only when the agent should publish. Revoke access at any time.</p>'
             . '<h2>Back up your content</h2><p>Export from Settings to download your content and images. Revision history is not a backup. Keep regular copies outside this server. The command-line guide explains restoring an export and resetting your password.</p>'
@@ -463,7 +463,7 @@ final readonly class View
             . '<header class="story-heading"><p class="eyebrow">' . self::date($page->updatedAt) . '</p><h1>' . self::e($page->draft->title) . '</h1>'
             . ($page->draft->excerpt !== '' ? '<p class="publication-intro">' . self::e($page->draft->excerpt) . '</p>' : '') . '</header>'
             . ($page->draft->cover !== null ? '<img class="story-hero" src="/media/' . $page->draft->cover . '" alt="' . self::e($coverAlt) . '">' : '')
-            . '<div class="prose">' . $this->markdown->render($page->draft->body) . '</div></article><a class="back" href="/">← All stories</a></main>';
+            . '<div class="prose">' . $this->markdown->render($page->draft->body) . '</div></article><a class="back" href="/">← All pages</a></main>';
         return $this->document($page->draft->title, $body . $this->publicFooter(), 'publication');
     }
 

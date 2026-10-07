@@ -1,15 +1,15 @@
 # Page types, languages, and themes
 
 The application owns public routes and design. Stage CMS owns editing,
-identity, revisions, publication, media, and agent access. A page type names
-its content fields; a theme renders that content.
+page IDs, revisions, publication, media, and agent access. A page type defines
+the fields editors fill in. A theme turns that content into a public page.
 
 ## Install in an application
 
 Install the public package in your existing Composer project:
 
 ```sh
-composer require skyyware/stage-cms:^0.5.2
+composer require skyyware/stage-cms:^0.5.3
 ```
 
 No VCS override or private repository access is required. Commit your
@@ -90,7 +90,7 @@ Passing a single Theme directly to Kernel remains supported, under the ID
 `custom`. Omitting it uses the built-in `publication` theme. Keep a stable ID
 when adding a registry to an existing installation.
 
-## Compose routes and storage
+## Connect routes and storage
 
 Forward `/admin`, `/api`, `/media`, `/health`, and the package's `/assets/`
 resources to the kernel, including the bundled fonts. The kernel serves its

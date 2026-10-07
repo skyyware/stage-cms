@@ -40,7 +40,7 @@ moves the live pointer in the same transaction. Reconcile stale content before
 retrying. Validation has no external side effects and should not call a network
 service while the database writer lock is held.
 
-Construct the same configured Cms instance for every write surface. The generic
+Use the same configured `Cms` instance for every route or script that writes content. The generic
 package CLI handles setup, identity, export, restore, and diagnosis; it does not
 load application-specific types or rules. Application scripts that mutate
 content must use the application's bootstrap.

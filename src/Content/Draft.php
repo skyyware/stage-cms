@@ -28,7 +28,7 @@ final readonly class Draft
             }
         }
         if (strlen(json_encode($fields, JSON_THROW_ON_ERROR)) > 200000) {
-            throw new Failure(422, 'invalid_fields', 'Keep named fields under 200 KB.');
+            throw new Failure(422, 'invalid_fields', 'Named fields must total at most 200,000 bytes when encoded as JSON.');
         }
         if (trim($title) === '' || mb_strlen($title) > 200) {
             throw new Failure(422, 'invalid_title', 'Give this page a title of 1 to 200 characters.');
@@ -38,7 +38,7 @@ final readonly class Draft
             throw new Failure(422, 'invalid_slug', 'Use a unique address with lowercase letters, numbers, and hyphens.');
         }
         if (mb_strlen($excerpt) > 500 || strlen($body) > 200000 || !mb_check_encoding($body, 'UTF-8')) {
-            throw new Failure(422, 'invalid_content', 'Keep the summary under 500 characters and the text under 200 KB.');
+            throw new Failure(422, 'invalid_content', 'Use a summary of at most 500 characters and UTF-8 text of at most 200,000 bytes.');
         }
         if ($cover !== null && !preg_match('/^[a-f0-9]{32}$/D', $cover)) {
             throw new Failure(422, 'invalid_cover', 'Choose an image from the media library.');

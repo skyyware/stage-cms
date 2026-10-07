@@ -37,7 +37,7 @@ Changing type keeps incompatible content visible until the editor moves or
 clears it. Save errors retain the submitted text and revision number. Required fields are
 marked as publication requirements; empty drafts remain saveable. Failed
 publication opens the affected field groups and associates messages with inputs.
-Named pages show their actual public address and assigned type. Translations
+Pages with fixed routes show their public address and assigned type. Translations
 link to separate editors; choosing another language never relabels existing text.
 
 Use direct labels and state what an action changes. Status needs text as well

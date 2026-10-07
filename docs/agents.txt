@@ -51,7 +51,7 @@ GET /api/pages?status=published returns latest editorial drafts of pages that
 have a publication; it is not a public-content feed. Read the current draft
 version before any write, even after reading the published snapshot.
 
-On 409 stale_revision, preserve your proposed change, re-read, and reconcile.
+On 409 stale_revision, keep your proposed change, read the latest revision, and compare.
 Do not silently replace expected_version and retry the same content.
 Writes are not idempotent. If a response is lost, inspect the page and history
 before retrying. A slug is unique, including archived and live page addresses.

@@ -145,7 +145,7 @@ final readonly class Pages
                 throw new Failure(409, 'archived', 'Recover the source page before creating a translation.');
             }
             if ($this->db->one('SELECT id FROM pages WHERE translation_group = :group AND locale = :locale', ['group' => $page->translationGroup, 'locale' => $locale]) !== null) {
-                throw new Failure(409, 'translation_exists', 'This page already has a version in that language, including its archive.');
+                throw new Failure(409, 'translation_exists', 'A page in this language already exists in the translation group. Check the archive too.');
             }
             $draft = new Draft($page->title, $slug, $page->excerpt, $page->draft->body, $page->cover, $page->type, $locale, $page->draft->fields);
             return $this->insert($caller, $draft, group: $page->translationGroup);
@@ -299,7 +299,7 @@ final readonly class Pages
         return $this->db->transaction(function () use ($caller, $id, $expectedVersion, $action, $draft): Page {
             $page = $this->load($id);
             if ($page->version !== $expectedVersion) {
-                throw new Failure(409, 'stale_revision', 'This page changed since you opened it. Your text is preserved here. Open the latest revision before saving again.');
+                throw new Failure(409, 'stale_revision', 'This page changed since you opened it. Keep your edits, read the latest revision, and compare before saving again.');
             }
             if ($page->archived && $action !== 'recovered') {
                 throw new Failure(409, 'archived', 'Restore this page from the archive before changing it.');

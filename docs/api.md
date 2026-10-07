@@ -27,7 +27,7 @@ curl -X POST http://127.0.0.1:8088/api/pages \
 ```
 
 The response contains the page ID, `version: 1`, and `status: "draft"`.
-Creation cannot publish. Read or list the page, then replace its draft:
+Creation always saves a draft. Read or list the page, then replace its draft:
 
 ```sh
 curl -X PUT "http://127.0.0.1:8088/api/pages/$PAGE_ID" \

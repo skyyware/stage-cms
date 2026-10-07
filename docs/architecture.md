@@ -1,9 +1,9 @@
-# One publication, shared operations
+# How Stage CMS stores and publishes content
 
 Stage CMS is one PHP application with SQLite and server-rendered HTML.
 The browser and JSON API use the same content operations. Stage supplies HTTP
 messages and routing. CommonMark renders Markdown with raw HTML stripped and
-unsafe links disabled. There is no mandatory model provider or browser build.
+unsafe links disabled. The application needs no model provider or JavaScript build step.
 
 ## The editing contract
 
@@ -13,10 +13,10 @@ the public version explicitly. Restoring an earlier revision creates a new
 draft. Archiving removes a page from public access while preserving its history.
 
 Every update to an existing page takes the expected revision. A stale revision fails
-without overwriting the current page. A database transaction owns the check,
-the new revision, and the publication pointer together.
+without overwriting the current page. One database transaction checks the
+version, records the revision, and updates which revision is public.
 
-## Owners
+## Code responsibilities
 
 - Identity owns the local owner, password verification, sessions, and scoped tokens.
 - Content owns pages, slugs, page type validation, languages, named fields,
@@ -37,8 +37,8 @@ Runtime is outside public/ and Git. SQLite uses foreign keys, WAL, a busy timeou
 and immediate write transactions. Images use generated names and validated
 content types. The public site reads published revisions only.
 
-Workspace and API lists select metadata without Markdown bodies or named field payloads. A bounded
-query reads one extra row to determine whether a next page exists. Individual
+Workspace and API lists read metadata without Markdown bodies or named fields.
+Each query reads one extra row to determine whether a next page exists. Individual
 reads load complete content. The PHP operations `Pages::browse()`,
 `Pages::revisions()`, `Pages::publication()`, and `Library::browse()` return a
 `Listing` with `items`, `number`, and `nextPage`. Page items are `PageSummary`
@@ -78,11 +78,11 @@ Markdown references. History retains those references for safe restoration.
 
 ## Alternatives
 
-A separate JavaScript application and API would duplicate state and deployment
-work in this first workflow. Application-defined text fields cover structured pages without introducing an
-executable template language or a general schema platform. Files alone would require another locking and
-index design for revisions and concurrent human/agent writes. SQLite keeps the
-initial deployment and transaction boundary in one place.
+A separate JavaScript frontend would need its own state handling and build.
+PHP renders the editor directly. Applications define text fields for structured
+pages, so content never needs an executable template language. Storing revisions
+in plain files would require separate locking and indexing. SQLite provides
+both and keeps each write in one transaction.
 
 ## Limits
 

@@ -49,7 +49,7 @@ final readonly class Archive
                         JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
                     $total = strlen($json);
                     if ($total > self::MAX_BYTES) {
-                        throw new Failure(413, 'export_too_large', 'This publication exceeds the 128 MB portable-export limit.');
+                        throw new Failure(413, 'export_too_large', 'This publication exceeds the 128 MiB portable-export limit.');
                     }
                     if (!$zip->addFromString('content.json', $json)) {
                         throw new \RuntimeException('Cannot add content to the export.');
@@ -58,7 +58,7 @@ final readonly class Archive
                         $asset = Asset::fromRow($row);
                         $total += $asset->bytes;
                         if ($total > self::MAX_BYTES) {
-                            throw new Failure(413, 'export_too_large', 'This publication exceeds the 128 MB portable-export limit. Back up the data directory while the application is stopped.');
+                            throw new Failure(413, 'export_too_large', 'This publication exceeds the 128 MiB portable-export limit. Back up the data directory while the application is stopped.');
                         }
                         if (!$zip->addFile($this->cms->media->path($asset->id), 'media/' . $asset->id . '.image')) {
                             throw new \RuntimeException('Cannot add an image to the export.');
@@ -72,7 +72,7 @@ final readonly class Archive
             });
             $bytes = file_get_contents($path);
             if ($bytes === false || strlen($bytes) > self::MAX_BYTES) {
-                throw new Failure(413, 'export_too_large', 'The export exceeds 128 MB.');
+                throw new Failure(413, 'export_too_large', 'The export exceeds 128 MiB.');
             }
             return $bytes;
         } finally {
@@ -85,7 +85,7 @@ final readonly class Archive
         $caller->require('admin');
         $size = is_file($path) ? filesize($path) : false;
         if ($size === false || $size > self::MAX_BYTES) {
-            throw new Failure(422, 'invalid_archive', 'Choose a Stage CMS export smaller than 128 MB.');
+            throw new Failure(422, 'invalid_archive', 'Choose an existing Stage CMS export no larger than 128 MiB.');
         }
         $zip = new ZipArchive();
         if ($zip->open($path, ZipArchive::RDONLY) !== true) {

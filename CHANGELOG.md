@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.3 — 2026-10-07
+
+Clarify editor help, page type instructions, agent access, and repository docs.
+Size messages now use the units and inclusive limits enforced by the code.
+Stale-write errors tell browser and API callers to compare their edits with
+the latest revision without claiming that the server saved a rejected request.
+
+No API, permission, schema, export-format, or content changes. Existing page
+history and publication remain unchanged. The standalone lockfile uses Stage 0.1.5.
+
 ## 0.5.2 — 2026-10-03
 
 Render Markdown tables in pages, previews, and revision views. Raw HTML stays

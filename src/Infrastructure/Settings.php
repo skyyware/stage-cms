@@ -22,7 +22,7 @@ final readonly class Settings
     {
         $caller->require('admin');
         if (trim($title) === '' || mb_strlen($title) > 100 || mb_strlen($description) > 300) {
-            throw new Failure(422, 'invalid_settings', 'Use a site name under 100 characters and a description under 300 characters.');
+            throw new Failure(422, 'invalid_settings', 'Enter a site name of 1 to 100 characters and a description of at most 300 characters.');
         }
         $theme ??= $this->get()['theme'];
         if ($theme !== '' && !preg_match('/^[a-z][a-z0-9-]{0,59}$/D', $theme)) {

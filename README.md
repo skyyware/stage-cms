@@ -10,8 +10,8 @@ and version history.
 Version 0.5 is an early, working release for one publication and one owner.
 It includes pages, Markdown editing, private previews, publication, revision
 restoration, named content fields, page types, languages, theme selection, an
-image library, agent connections, and portable export/restore. Pages have stable
-identities, linked translations, optional fixed public paths, and publication rules.
+image library, agent connections, and content export and restore. Pages have
+permanent IDs, linked translations, optional fixed URLs, and publication rules.
 The API and database format may change before 1.0.
 
 ## Start a publication
@@ -24,7 +24,7 @@ Install the tagged application from
 No GitHub account, SSH identity, or custom Composer repository is required.
 
 ```sh
-composer create-project skyyware/stage-cms my-site "^0.5.2" --no-plugins
+composer create-project skyyware/stage-cms my-site "^0.5.3" --no-plugins
 cd my-site
 php bin/cms setup --name="Your name" --email="you@example.com"
 composer serve
@@ -39,7 +39,7 @@ analytics, mandatory cloud services, or JavaScript build step. Source code,
 packages, and private data stay outside the web root. Serve only `public/`.
 Read the [deployment guide](docs/operations.md) before using a public server.
 
-## A small, complete workflow
+## Edit and publish a page
 
 1. Create a page. Choose its type and language. Write in its named fields or Markdown.
 2. Save a private draft. Preview opens the latest saved version.
@@ -56,7 +56,7 @@ Settings contains the publication name, description, installed theme, and a ZIP 
 content, revisions, and images. Exports exclude passwords and agent tokens.
 See [recovery](docs/operations.md#recovery).
 
-## An agent is a caller with limited access
+## Give an agent access
 
 Create a named connection in **Agents**. Copy its token once. Give it draft
 access first; publication is a separate permission. Connections expire and can
@@ -67,8 +67,9 @@ curl -H "Authorization: Bearer $STAGE_CMS_TOKEN" \
   http://127.0.0.1:8088/api/pages
 ```
 
-Every update supplies the version it read. A stale update returns `409`;
-the caller must compare and reconcile before trying again. Content cannot
+Every update supplies the version it read. If someone else has saved first,
+the update returns `409`. Read the latest version and compare your changes
+before trying again. Content cannot
 grant permissions, change credentials, or override the application's rules.
 
 The [agent guide](docs/agents.txt), [API guide](docs/api.md), and
@@ -77,7 +78,7 @@ instances serve the guide at `/api/guide` and the schema at `/api/schema`.
 Standalone installations also serve the guide at `/llms.txt`. The CMS does not require
 a particular model, agent provider, or MCP server.
 
-## One application you can own
+## How it runs
 
 Stage handles requests, routes, responses, and caller permissions. This
 application owns content, identity, storage, and presentation. SQLite stores
@@ -87,8 +88,8 @@ The core writing workflow also works without JavaScript.
 
 For an existing site, install this package and supply a [publication theme](docs/themes.md).
 
-Read the [architecture](docs/architecture.md) and [design](docs/design.md).
-The intent is to make the whole application understandable to one person.
+Read the [architecture](docs/architecture.md) for the code and storage layout,
+and [design](docs/design.md) for the editing interface.
 
 ## Develop and contribute
 
@@ -129,7 +130,8 @@ blocked by the content security policy; upload them to the library.
 
 Pages, history, and images use 50-item pagination. Lists read summaries; complete
 content loads when opened or explicitly requested through the API. Images are limited to
-5 MiB and 16 megapixels; bodies to 200 KB and named fields to 200 KB of encoded JSON. Portable exports are limited to
+5 MiB and 16 megapixels. Bodies and the combined JSON for named fields are each
+limited to 200,000 bytes. Portable exports are limited to
 128 MiB uncompressed. Large installations need their own measured capacity and
 backup plan. No horizontal write scaling or independent security audit is
 claimed for this release.

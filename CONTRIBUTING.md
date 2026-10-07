@@ -16,7 +16,7 @@ For a change:
 4. Run `composer check`.
 5. For interface work, test an actual editing/publication flow on desktop and
    mobile, with keyboard navigation. Use synthetic content in screenshots.
-6. Open a focused pull request describing the problem, behavior, and evidence.
+6. Open a pull request for that change. Describe the problem, resulting behavior, and checks performed.
 
 Humans and coding agents meet the same standards. Content operations own their
 permission checks. Treat untrusted content as data. Preserve other people's

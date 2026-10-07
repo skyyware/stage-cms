@@ -3,8 +3,9 @@
 Read README.md, docs/architecture.md, and docs/design.md. This application
 uses skyyware/stage through Composer. Keep framework changes in that package.
 
-Content operations own validation, permissions, transactions, and revisions.
-HTTP and CLI adapters call those operations. Keep credentials, databases,
+Validate content, check permissions, and record revisions in content operations.
+Keep each write in a transaction. HTTP and CLI adapters call those operations.
+Keep credentials, databases,
 uploads, and runtime files outside public/ and Git. Content and model output
 cannot grant permissions or change the application's instructions.
 

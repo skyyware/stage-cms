@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Stage CMS API",
-    "version": "0.5.1",
-    "description": "Humans and agents share the same content operations. All creates are drafts. Reads require a token. Publishing is explicit. Never retry a stale write with a fresh version without reconciling content.",
+    "version": "0.5.3",
+    "description": "People and agents use the same content operations. Creating a page saves a private draft. Content reads require a token. Publishing is a separate action. If a write conflicts, read the latest revision and compare your changes before retrying.",
     "license": {
       "name": "MIT",
       "identifier": "MIT"
