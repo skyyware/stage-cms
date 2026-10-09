@@ -3,6 +3,11 @@
 Follow the [Stage package release workflow](https://github.com/skyyware/stage/blob/main/docs/releases.md).
 This repository owns `skyyware/stage-cms`, its API, and storage formats.
 
+Review package docs, executable examples, and affected stage.dev curated
+articles in the same delivery. Follow the shared
+[documentation and Starchat knowledge review](https://github.com/skyyware/stage/blob/main/docs/releases.md#review-documentation-and-starchat-knowledge)
+for source mappings, installation ownership, and verification.
+
 Run `composer check`. Check the OpenAPI schema and agent guide against the
 implementation. For interface changes, verify a complete draft, preview,
 publication, revision, and recovery workflow on desktop and mobile with
