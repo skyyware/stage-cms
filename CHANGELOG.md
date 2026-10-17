@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.5.4 — 2026-10-17
+
+Allow Stage 0.2 alongside the existing Stage 0.1 constraint. The standalone
+lockfile uses Stage 0.2.0, which normalizes request header names and rejects
+malformed or duplicate header maps before dispatch. Direct PHP adapters can
+pass `Authorization` or `authorization` to the same CMS authentication path.
+These constructor guarantees require Stage 0.2; embedded applications that
+retain Stage 0.1 keep its existing request behavior.
+
+No CMS API, permission, schema, export-format, or editing changes. Content
+operations continue to enforce token scopes and expected revisions. Existing
+0.5 applications need no database migration.
+
 ## 0.5.3 — 2026-10-07
 
 Clarify editor help, page type instructions, agent access, and repository docs.

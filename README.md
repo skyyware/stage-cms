@@ -24,7 +24,7 @@ Install the tagged application from
 No GitHub account, SSH identity, or custom Composer repository is required.
 
 ```sh
-composer create-project skyyware/stage-cms my-site "^0.5.3" --no-plugins
+composer create-project skyyware/stage-cms my-site "^0.5.4" --no-plugins
 cd my-site
 php bin/cms setup --name="Your name" --email="you@example.com"
 composer serve
@@ -85,6 +85,12 @@ application owns content, identity, storage, and presentation. SQLite stores
 structured state; images live in a private directory. PHP renders the interface.
 A little browser JavaScript helps with formatting and unsaved changes.
 The core writing workflow also works without JavaScript.
+
+CMS 0.5.4 accepts Stage 0.1 and 0.2. The standalone lockfile installs Stage 0.2.0.
+In Stage 0.2, directly constructed requests normalize header names and reject
+malformed or duplicate headers before the CMS runs. Review the
+[Stage upgrade notes](https://github.com/skyyware/stage/blob/v0.2.0/CHANGELOG.md)
+when embedding the CMS in an existing application.
 
 For an existing site, install this package and supply a [publication theme](docs/themes.md).
 
